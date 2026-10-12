@@ -15,3 +15,6 @@ body{background:radial-gradient(ellipse at 75% -18%,#edf0e7 0%,transparent 46%),
 .toolbar input,.toolbar select{background:#fffdf8}
 .toolbar input:focus,.toolbar select:focus{border-color:#688c76}
 .notice{background:#e7eee3;color:#365746}
+
+/* Verified market data */
+.market-change{font-size:16px;font-weight:800;margin-bottom:8px}.market-change.positive{color:#a84251}.market-change.negative{color:#3e6993}.market-source{display:block;color:#526b5a;text-decoration:underline;text-underline-offset:3px}.chart-display{min-height:205px;padding:16px 0 2px;display:flex;flex-direction:column;gap:6px}.chart-display>b{font-size:13px;color:var(--muted)}.chart-display svg{width:100%;height:155px;background:repeating-linear-gradient(to top,transparent 0 40px,#688c7616 41px 42px);border-radius:9px}.chart-display a{align-self:flex-end;color:#476b55}.report-table{width:100%;border-collapse:collapse;font-size:14px}.report-table td,.report-table th{padding:12px 8px;text-align:left;border-bottom:1px solid var(--stroke)}.report-table th{color:#4b6355;font-weight:700}.report-article blockquote{border-left:3px solid var(--accent);padding:10px 15px;background:#e7eee3;margin:16px 0;border-radius:0 8px 8px 0}.source-list a{color:#39684a;text-decoration:underline;text-underline-offset:3px}.quiz{background:#e5e9df;padding:20px;border-radius:14px}
