@@ -1,25 +1,25 @@
 {
-  "updatedAt": "2026-10-12T15:18:00+09:00",
+  "updatedAt": "2026-10-12T16:46:26+09:00",
   "status": "confirmed_closes",
-  "note": "확정된 최근 거래일의 종가입니다. 실시간 시세가 아닙니다.",
+  "note": "한국 2개 지수는 2026-10-12 Yahoo·네이버 종가 교차 점검. 미국 지수는 기존의 개별 기준일을 확인하세요. 실시간 데이터가 아닙니다.",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "date": "2026-10-08",
-      "close": 6625.93,
-      "changePct": -2.62,
-      "source": "https://markets.ft.markitdigital.com/data/indices/tearsheet/historical?s=KSPI%3AKSC"
+      "date": "2026-10-12",
+      "close": 6384.24,
+      "changePct": -3.65,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "date": "2026-10-08",
-      "close": 892.27,
-      "changePct": -0.69,
-      "source": "https://snowshagal.com/reports/en/2026-10-10_Korea_Weekly_Report_EN"
+      "date": "2026-10-12",
+      "close": 849.19,
+      "changePct": -4.83,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/"
     },
     {
       "id": "sp500",
@@ -57,6 +57,10 @@
       {
         "date": "2026-10-08",
         "value": 6625.93
+      },
+      {
+        "date": "2026-10-12",
+        "value": 6384.24
       }
     ],
     "us": [
@@ -83,7 +87,7 @@
     ]
   },
   "historySources": {
-    "kr": "https://markets.ft.markitdigital.com/data/indices/tearsheet/historical?s=KSPI%3AKSC",
+    "kr": "https://finance.yahoo.com/quote/%5EKS11/history/",
     "us": "https://www.portfolio-terminal.com/markets/stock-market-close"
   }
 }
