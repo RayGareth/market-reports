@@ -1,0 +1,39 @@
+name: Publish Verified Market Daily at 17 KST
+on:
+  schedule:
+    - cron: '0 8 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: market-daily-close-publish
+  cancel-in-progress: false
+jobs:
+  close-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements-market.txt
+      - name: Install data readers
+        run: pip install -r requirements-market.txt
+      - name: Verify today's KRX closes against Yahoo Finance and write source JSON
+        run: python scripts/collect_close.py
+        env:
+          TZ: Asia/Seoul
+      - name: Generate standardized Ivory and Sage daily HTML and archive
+        run: python scripts/build_reports.py
+      - name: Commit only verified generated materials
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/daily data/market-snapshot.json reports/daily/ reports/index.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish verified market close $(TZ=Asia/Seoul date +%F)"
+            git pull --rebase
+            git push
+          fi
