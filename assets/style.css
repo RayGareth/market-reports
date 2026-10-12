@@ -18,3 +18,21 @@ body{background:radial-gradient(ellipse at 75% -18%,#edf0e7 0%,transparent 46%),
 
 /* Verified market data */
 .market-change{font-size:16px;font-weight:800;margin-bottom:8px}.market-change.positive{color:#a84251}.market-change.negative{color:#3e6993}.market-source{display:block;color:#526b5a;text-decoration:underline;text-underline-offset:3px}.chart-display{min-height:205px;padding:16px 0 2px;display:flex;flex-direction:column;gap:6px}.chart-display>b{font-size:13px;color:var(--muted)}.chart-display svg{width:100%;height:155px;background:repeating-linear-gradient(to top,transparent 0 40px,#688c7616 41px 42px);border-radius:9px}.chart-display a{align-self:flex-end;color:#476b55}.report-table{width:100%;border-collapse:collapse;font-size:14px}.report-table td,.report-table th{padding:12px 8px;text-align:left;border-bottom:1px solid var(--stroke)}.report-table th{color:#4b6355;font-weight:700}.report-article blockquote{border-left:3px solid var(--accent);padding:10px 15px;background:#e7eee3;margin:16px 0;border-radius:0 8px 8px 0}.source-list a{color:#39684a;text-decoration:underline;text-underline-offset:3px}.quiz{background:#e5e9df;padding:20px;border-radius:14px}
+
+/* Section separation and interactive market quiz */
+.report-article > section + section{border-top:1px solid #bacbb9;margin-top:42px;padding-top:36px}
+.report-article > section + section > .eyebrow{margin-top:0}
+.report-article .quiz{padding:24px;background:#e5e9df;border:1px solid #d0dbc9}
+.market-quiz fieldset{border:0;padding:0;margin:0;min-width:0}
+.market-quiz legend{font-weight:700;color:var(--fg);padding:0;margin-bottom:17px;line-height:1.8}
+.quiz-option{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1px solid #c6d1c2;border-radius:10px;margin:9px 0;background:#f8f8f3;cursor:pointer;transition:background .15s,border-color .15s}
+.quiz-option:hover,.quiz-option:has(input:checked){background:#e0ece0;border-color:#688c76}
+.quiz-option input{accent-color:#688c76;width:17px;height:17px;margin-top:4px;flex-shrink:0;cursor:pointer}
+.quiz-option span{font-size:14px;line-height:1.75}
+.quiz-controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px;align-items:center}
+.quiz-controls .button-ghost{background:#f7f5ef;color:#365746;cursor:pointer}
+.quiz-feedback{margin-top:18px;border-radius:10px;padding:16px 18px;background:#ecf3e9;border:1px solid #a8c4a8;color:#284735}
+.quiz-feedback.incorrect{background:#fff2e9;border-color:#dfc2ad;color:#754a30}
+.quiz-feedback p{margin:6px 0 0;color:inherit}
+.quiz-feedback[hidden]{display:none}
+@media(max-width:550px){.report-article > section + section{margin-top:32px;padding-top:29px}.report-article .quiz{padding:16px}}
