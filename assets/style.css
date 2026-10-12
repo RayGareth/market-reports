@@ -36,3 +36,7 @@ body{background:radial-gradient(ellipse at 75% -18%,#edf0e7 0%,transparent 46%),
 .quiz-feedback p{margin:6px 0 0;color:inherit}
 .quiz-feedback[hidden]{display:none}
 @media(max-width:550px){.report-article > section + section{margin-top:32px;padding-top:29px}.report-article .quiz{padding:16px}}
+
+/* Keep Ivory & Sage in mobile browser dark mode as well. */
+html,body{color-scheme:light;background-color:#f7f5ef}
+@media(prefers-color-scheme:dark){:root{color-scheme:light}html,body{background-color:#f7f5ef;color:#25362d}input,select,button,textarea{color-scheme:light}}
