@@ -1,2 +1,2 @@
-pykrx==1.0.51
+pykrx==1.2.9
 yfinance==0.2.65
