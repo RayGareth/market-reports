@@ -35,7 +35,7 @@ jobs:
           day=sys.argv[1]
           doc=json.loads(Path(f"content/daily/{day}.json").read_text())
           if doc.get("publish") and doc.get("verification")=="verified":
-              with open(__import__("os").environ["GITHUB_OUTPUT"],"a") as out: out.write("already_published=true\\n")
+              with open(__import__("os").environ["GITHUB_OUTPUT"],"a") as out: out.write("already_published=true\n")
           PY
           fi
       - name: Verify Python syntax before fetching data
