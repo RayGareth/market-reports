@@ -56,12 +56,13 @@ def cross_check(index_name, yahoo, naver):
     return yahoo
 def main():
     # Github Actions must not publish before the standard closing feed has settled.
-    if os.getenv("ALLOW_EARLY")!="1" and (NOW.hour<16 or (NOW.hour==16 and NOW.minute<45)):
+    if NOW.hour<16 or (NOW.hour==16 and NOW.minute<45):
         raise ValueError("Refusing to publish before 16:45 KST")
     kr= sources_for("^KS11","1001",DATE)
     kq= sources_for("^KQ11","2001",DATE)
     if kr is None and kq is None:
-        raise ValueError("No same-day Yahoo daily bars; holiday or provider delay. Publishing blocked.")
+        print("NO_SAME_DAY_CLOSE: market holiday or delayed feed; no publication.")
+        return
     if kr is None or kq is None:raise ValueError("Only one Korean index has a same-date Yahoo closing bar.")
     kr=cross_check("KOSPI",kr,naver_close("KOSPI",DATE))
     kq=cross_check("KOSDAQ",kq,naver_close("KOSDAQ",DATE))
