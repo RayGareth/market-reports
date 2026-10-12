@@ -1,7 +1,9 @@
-name: Publish Market Daily at 17 KST (Yahoo single-source)
+name: Publish Market Daily at 17 KST (Yahoo + Naver)
 on:
   schedule:
     - cron: '0 8 * * 1-5'
+    - cron: '15 8 * * 1-5'
+    - cron: '30 8 * * 1-5'
   workflow_dispatch:
 permissions:
   contents: write
@@ -21,10 +23,12 @@ jobs:
           cache-dependency-path: requirements-market.txt
       - name: Install data readers
         run: pip install -r requirements-market.txt
-      - name: Inspect same-day Yahoo Finance closing bars
+      - name: Cross-check same-day Yahoo and Naver closes
         run: python scripts/collect_close.py
         env:
           TZ: Asia/Seoul
+      - name: Verify report generator and collector syntax
+        run: python -m py_compile scripts/collect_close.py scripts/build_reports.py
       - name: Generate standardized Ivory and Sage daily HTML and archive
         run: python scripts/build_reports.py
       - name: Commit only verified generated materials
