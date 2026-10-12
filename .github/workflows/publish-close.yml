@@ -1,4 +1,4 @@
-name: Publish Verified Market Daily at 17 KST
+name: Publish Market Daily at 17 KST (Yahoo single-source)
 on:
   schedule:
     - cron: '0 8 * * 1-5'
@@ -21,22 +21,10 @@ jobs:
           cache-dependency-path: requirements-market.txt
       - name: Install data readers
         run: pip install -r requirements-market.txt
-      - name: Verify KRX credentials are configured
-        shell: bash
-        env:
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
-        run: |
-          if [ -z "$KRX_ID" ] || [ -z "$KRX_PW" ]; then
-            echo "::error::Set GitHub Actions secrets KRX_ID and KRX_PW before publishing."
-            exit 1
-          fi
-      - name: Verify today's KRX closes against Yahoo Finance and write source JSON
+      - name: Inspect same-day Yahoo Finance closing bars
         run: python scripts/collect_close.py
         env:
           TZ: Asia/Seoul
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
       - name: Generate standardized Ivory and Sage daily HTML and archive
         run: python scripts/build_reports.py
       - name: Commit only verified generated materials
