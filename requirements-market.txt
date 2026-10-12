@@ -1,1 +1,2 @@
 yfinance==0.2.65
+requests>=2.31,<3
