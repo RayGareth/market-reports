@@ -40,3 +40,8 @@ body{background:radial-gradient(ellipse at 75% -18%,#edf0e7 0%,transparent 46%),
 /* Keep Ivory & Sage in mobile browser dark mode as well. */
 html,body{color-scheme:light;background-color:#f7f5ef}
 @media(prefers-color-scheme:dark){:root{color-scheme:light}html,body{background-color:#f7f5ef;color:#25362d}input,select,button,textarea{color-scheme:light}}
+
+/* Market overview dates: full-width rows on mobile */
+.market-date-details{display:flex;flex-direction:column;align-items:flex-start;gap:2px;color:var(--muted);margin:4px 0 20px;min-width:0}
+.market-date-line{display:block;max-width:100%;overflow-wrap:normal;word-break:keep-all}
+.market-date-disclaimer{font-size:13px;margin-top:4px}
