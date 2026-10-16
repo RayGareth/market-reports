@@ -84,9 +84,11 @@ def make_daily_quiz(date, kr, kq):
        "options":["두 수익률의 차이가 2퍼센트포인트다","두 지수의 가격 차이가 2포인트다","두 지수의 거래량 차이가 2%다"],
        "answer":0,"explanation":"%p는 두 퍼센트 수치 사이의 산술적 차이를 뜻합니다. 지수 포인트나 거래량과는 다릅니다."},
     ]
-    # Weekday publications: advance one question each calendar day, including weekends,
-    # so consecutive trading days do not repeat even across a weekend.
-    index=(day.toordinal())%len(questions)
+    # Weekday rotation: adjacent weekday publications receive different quiz types.
+    # Count weekdays rather than calendar days, avoiding weekly repeats.
+    days=(day-date_type(2000,1,3)).days
+    trading_slots=(days//7)*5+min(days%7,5)
+    index=trading_slots%len(questions)
     return questions[index]
 
 def main():
