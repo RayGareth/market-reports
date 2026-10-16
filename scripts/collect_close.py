@@ -54,6 +54,41 @@ def cross_check(index_name, yahoo, naver):
     if diff>tolerance:
         raise ValueError(f"{index_name}: Yahoo {yahoo['close']} / Naver {naver} differ by {diff:.2f} (limit {tolerance:.2f})")
     return yahoo
+def make_daily_quiz(date, kr, kq):
+    """Deterministic, market-grounded quiz rotation; no extra data sources."""
+    from datetime import date as date_type
+    day=date_type.fromisoformat(date)
+    spread=round(abs(kr["changePct"]-kq["changePct"]),2)
+    leader="코스피" if kr["changePct"]>kq["changePct"] else "코스닥" if kq["changePct"]>kr["changePct"] else "동일"
+    leader_wrong="코스닥" if leader=="코스피" else "코스피"
+    questions=[
+      {"question":f"{date} 코스피 {kr['changePct']:+.2f}%, 코스닥 {kq['changePct']:+.2f}%일 때 두 지수의 일간 수익률 차이는?",
+       "options":[f"{spread:.2f}%p",f"{spread:.2f}%",f"{abs(kr['changePct'])+abs(kq['changePct']):.2f}%p"],
+       "answer":0,"explanation":f"수익률 차이는 |{kr['changePct']:+.2f} - ({kq['changePct']:+.2f})| = {spread:.2f}%p입니다. 퍼센트끼리의 차이는 퍼센트포인트(%p)로 표시합니다."},
+      {"question":f"{date} 코스피 {kr['changePct']:+.2f}%, 코스닥 {kq['changePct']:+.2f}%일 때 상대적으로 강했던 시장은?",
+       "options":[leader_wrong,"두 시장의 등락률은 언제나 같다",leader],
+       "answer":2,"explanation":f"등락률을 비교하면 {'두 시장이 동일합니다' if leader=='동일' else leader+'가 상대적으로 강했습니다'}. 상대 강도는 투자자별 순매수를 뜻하지 않습니다."},
+      {"question":"코스피·코스닥 지수 등락률만으로 알 수 없는 정보는 무엇일까요?",
+       "options":["두 지수의 상대 강도","외국인·기관·개인의 순매수 금액","두 지수의 상승·하락 방향"],
+       "answer":1,"explanation":"지수 등락률만으로 투자 주체별 순매수액을 추론할 수 없습니다. 별도로 검증된 수급 데이터가 필요합니다."},
+      {"question":"오늘의 종가와 전 거래일 종가를 비교한 수익률의 의미는 무엇일까요?",
+       "options":["전 거래일 종가 대비 가격 변화율","장중 최고가 대비 가격 변화율","거래대금의 변화율"],
+       "answer":0,"explanation":"일간 등락률은 (오늘 종가 / 전 거래일 종가 - 1) × 100으로 계산합니다."},
+      {"question":"확정 종가와 장중 시세를 구분해야 하는 이유로 가장 적절한 것은?",
+       "options":["장중 시세는 언제나 확정 종가와 같다","확정 종가는 다음 거래일에도 바뀌지 않는 예측치다","장중 가격은 계속 변하므로 거래일·기준 시각을 확인해야 한다"],
+       "answer":2,"explanation":"장중 가격은 변동할 수 있습니다. 리포트는 같은 거래일의 마감 데이터를 확인하고 기준일을 표시해야 합니다."},
+      {"question":"하루 동안 코스닥 수익률이 코스피보다 높았을 때 올바른 해석은?",
+       "options":["모든 코스닥 종목이 상승했다","그날 코스닥 지수가 상대적으로 강했다","외국인이 코스닥을 순매수했다"],
+       "answer":1,"explanation":"지수 간 상대 강도는 비교할 수 있지만, 개별 종목 상승 여부나 투자 주체별 매매는 별도 자료가 필요합니다."},
+      {"question":"지수의 일간 수익률 차이가 2%p라는 표현의 의미는?",
+       "options":["두 수익률의 차이가 2퍼센트포인트다","두 지수의 가격 차이가 2포인트다","두 지수의 거래량 차이가 2%다"],
+       "answer":0,"explanation":"%p는 두 퍼센트 수치 사이의 산술적 차이를 뜻합니다. 지수 포인트나 거래량과는 다릅니다."},
+    ]
+    # Weekday publications: advance one question each calendar day, including weekends,
+    # so consecutive trading days do not repeat even across a weekend.
+    index=(day.toordinal())%len(questions)
+    return questions[index]
+
 def main():
     # Github Actions must not publish before the standard closing feed has settled.
     if NOW.hour<16 or (NOW.hour==16 and NOW.minute<45):
@@ -84,7 +119,7 @@ def main():
       {"title":"다음 거래일 관전 포인트","paragraphs":["장 마감 후 공개되는 공식 수급 집계와 주요 기업 공시를 점검합니다.","다음 거래일의 시장 방향은 확정할 수 없으므로 뉴스 해석과 가격 데이터를 구분합니다."]},
       {"title":"오늘의 복습 퀴즈","paragraphs":["시장 기준일 확인 퀴즈"]},
     ]
-    q={"question":"자동 시장 리포트의 '확정 종가'로 인정하기 위한 조건은 무엇일까요?","options":["장중 시세 한 곳만 확인한다.","Yahoo Finance와 네이버 금융의 거래일·종가 일치 여부를 대조한다.","전 거래일 종가를 오늘 날짜로 표시한다."],"answer":1,"explanation":"당일 Yahoo Finance 일별 종가와 네이버 금융 일별 종가를 교차 대조하며, 어느 한쪽이라도 누락되거나 허용 차이를 넘으면 발행하지 않습니다."}
+    q=make_daily_quiz(weekday,kr,kq)
     src=[
       {"label":"Yahoo Finance KOSPI Historical Data","url":"https://finance.yahoo.com/quote/%5EKS11/history/"},
       {"label":"Yahoo Finance KOSDAQ Historical Data","url":"https://finance.yahoo.com/quote/%5EKQ11/history/"},
