@@ -111,12 +111,40 @@ def main():
         "지수별 종가는 Yahoo Finance의 일별 종가·OHLC를 네이버 금융의 동일 거래일 종가와 대조했습니다. 두 출처 간 0.05% 또는 최소 0.5포인트 이내로 일치할 때만 발행합니다."
     ]
     mix="같은 방향" if kr["changePct"]*kq["changePct"]>0 else "서로 다른 방향"
+    # SECTION 05: explain only what the verified index changes establish.
+    kp, qp = kr["changePct"], kq["changePct"]
+    gap = abs(kp - qp)
+    if kp > 0 and qp > 0:
+        situation = "두 지수가 모두 상승"
+        lesson = "상승률 비교"
+        explanation = "두 지수가 함께 올라도 상승률은 다를 수 있습니다. 차이는 퍼센트포인트(%p)로 비교합니다."
+    elif kp < 0 and qp < 0:
+        situation = "두 지수가 모두 하락"
+        lesson = "하락률과 변동 폭"
+        explanation = "두 지수가 함께 하락해도 하락 폭은 다를 수 있습니다. 등락률의 차이는 퍼센트포인트(%p)로 표시합니다."
+    elif kp * qp < 0:
+        situation = "두 지수가 서로 다른 방향으로 움직임"
+        lesson = "시장 간 차별화"
+        explanation = "같은 날에도 시장별 지수 방향은 달라질 수 있습니다. 지수의 방향만으로 개별 종목의 움직임을 알 수는 없습니다."
+    elif kp == 0 and qp == 0:
+        situation = "두 지수의 등락률이 모두 0.00%"
+        lesson = "보합과 등락률"
+        explanation = "등락률 0.00%는 표시된 자릿수 기준의 값입니다. 모든 구성 종목의 가격이 같았다는 의미는 아닙니다."
+    else:
+        situation = "한 지수는 보합이고 다른 지수는 변동"
+        lesson = "보합과 시장 비교"
+        explanation = "보합과 상승·하락은 서로 다른 시장 흐름을 보여줍니다. 지수 변화만으로 원인을 확정할 수 없습니다."
+    reading = [
+        f"오늘의 시장 해석 | 코스피 {kp:+.2f}%, 코스닥 {qp:+.2f}%로 {situation}했습니다. 두 지수의 등락률 차이는 {gap:.2f}%p입니다.",
+        f"오늘의 경제 개념 · {lesson} | {explanation}",
+        "오늘의 이해 포인트 | 지수 등락률만으로 모든 종목의 방향이나 외국인·기관·개인의 매매 동향, 등락 원인을 판단할 수 없습니다."
+    ]
     sections=[
       {"title":"시장 온도: 정규장 종가","paragraphs":market_lines,"marketTable":{"date":weekday,"rows":[{"market":"KOSPI","close":kr["close"],"changePct":kr["changePct"]},{"market":"KOSDAQ","close":kq["close"],"changePct":kq["changePct"]}]}},
       {"title":"시장 흐름 타임라인","paragraphs":[f"{weekday} 국내 장 마감: 코스피는 {direction(kr)}, 코스닥은 {direction(kq)} 마감했습니다.","미국 등 해외 시장의 실시간 뉴스·종가는 이번 자동 원고의 검증 범위 밖입니다. 검증되지 않은 뉴스는 포함하지 않습니다."]},
       {"title":"핵심 인사이트: 상대 강도 점검","paragraphs":[f"코스피 등락률 {kr['changePct']:+.2f}%와 코스닥 등락률 {kq['changePct']:+.2f}%는 {mix}입니다.",f"두 지수의 일간 수익률 차이는 {abs(kr['changePct']-kq['changePct']):.2f}%p입니다. 단일 거래일의 차이만으로 주도 업종의 장기 전환을 판단하지 않습니다."]},
       {"title":"수급과 업종: 확인된 상대 강도와 미검증 수급","paragraphs":[f"시장 간 상대 강도: 코스피 {kr['changePct']:+.2f}%, 코스닥 {kq['changePct']:+.2f}%. {'코스피가 상대적으로 강했습니다' if kr['changePct']>kq['changePct'] else '코스닥이 상대적으로 강했습니다' if kr['changePct']<kq['changePct'] else '두 지수의 수익률이 같았습니다'}. 이는 시장 지수의 상대 강도일 뿐, 특정 업종이나 매매 주체의 움직임을 증명하지 않습니다.","외국인·기관·개인 순매수액과 업종별 등락률은 검증된 원천 데이터가 확보되지 않아 숫자를 기재하지 않습니다. 순매수는 거래대금 기준이며, 지수 하락만으로 외국인 순매도를 추정할 수 없습니다.","추가 검증 대상: 외국인·기관 순매수, 업종별 상승·하락 폭, 업종 거래대금, 대형주 지수 기여도. 수치와 출처가 확보된 경우에만 해당 항목의 해석을 발행합니다."]},
-      {"title":"경제 리딩: 지수와 등락률","paragraphs":["지수 수준은 특정 시점의 시장 가격을 요약한 값이며, 일간 등락률은 직전 거래일 종가와 오늘 종가를 비교해 계산합니다.","같은 1% 변동이라도 시가총액과 업종 구성에 따라 투자자가 체감하는 영향은 다를 수 있습니다."]},
+      {"title":"오늘의 시장 읽기","paragraphs":reading},
       {"title":"액션 플랜: 조건 중심 점검","paragraphs":["다음 거래일에는 금리·환율과 글로벌 선물 흐름, 대형주의 상대 강도, 외국인·기관 매매 자료를 함께 확인합니다.","이 내용은 매수·매도 추천이 아닌 관찰 항목입니다. 변동성 확대 시 개인의 투자 기간과 위험 감수 범위를 우선 고려하세요."]},
       {"title":"다음 거래일 관전 포인트","paragraphs":["장 마감 후 공개되는 공식 수급 집계와 주요 기업 공시를 점검합니다.","다음 거래일의 시장 방향은 확정할 수 없으므로 뉴스 해석과 가격 데이터를 구분합니다."]},
       {"title":"오늘의 복습 퀴즈","paragraphs":["시장 기준일 확인 퀴즈"]},
