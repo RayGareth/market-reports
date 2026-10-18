@@ -1,9 +1,9 @@
-name: Publish Market Daily at 17 KST (Yahoo + Naver)
+name: Publish Market Daily at 18 KST (Yahoo + Naver)
 on:
   schedule:
-    - cron: '0 8 * * 1-5'
-    - cron: '15 8 * * 1-5'
-    - cron: '30 8 * * 1-5'
+    - cron: '0 9 * * 1-5'
+    - cron: '15 9 * * 1-5'
+    - cron: '30 9 * * 1-5'
   workflow_dispatch:
 permissions:
   contents: write
