@@ -112,7 +112,7 @@ def main():
     ]
     mix="같은 방향" if kr["changePct"]*kq["changePct"]>0 else "서로 다른 방향"
     sections=[
-      {"title":"시장 온도: 국내 정규장 종가","paragraphs":market_lines},
+      {"title":"시장 온도: 정규장 종가","paragraphs":market_lines,"marketTable":{"date":weekday,"rows":[{"market":"KOSPI","close":kr["close"],"changePct":kr["changePct"]},{"market":"KOSDAQ","close":kq["close"],"changePct":kq["changePct"]}]}},
       {"title":"시장 흐름 타임라인","paragraphs":[f"{weekday} 국내 장 마감: 코스피는 {direction(kr)}, 코스닥은 {direction(kq)} 마감했습니다.","미국 등 해외 시장의 실시간 뉴스·종가는 이번 자동 원고의 검증 범위 밖입니다. 검증되지 않은 뉴스는 포함하지 않습니다."]},
       {"title":"핵심 인사이트: 상대 강도 점검","paragraphs":[f"코스피 등락률 {kr['changePct']:+.2f}%와 코스닥 등락률 {kq['changePct']:+.2f}%는 {mix}입니다.",f"두 지수의 일간 수익률 차이는 {abs(kr['changePct']-kq['changePct']):.2f}%p입니다. 단일 거래일의 차이만으로 주도 업종의 장기 전환을 판단하지 않습니다."]},
       {"title":"수급과 업종: 확인된 상대 강도와 미검증 수급","paragraphs":[f"시장 간 상대 강도: 코스피 {kr['changePct']:+.2f}%, 코스닥 {kq['changePct']:+.2f}%. {'코스피가 상대적으로 강했습니다' if kr['changePct']>kq['changePct'] else '코스닥이 상대적으로 강했습니다' if kr['changePct']<kq['changePct'] else '두 지수의 수익률이 같았습니다'}. 이는 시장 지수의 상대 강도일 뿐, 특정 업종이나 매매 주체의 움직임을 증명하지 않습니다.","외국인·기관·개인 순매수액과 업종별 등락률은 검증된 원천 데이터가 확보되지 않아 숫자를 기재하지 않습니다. 순매수는 거래대금 기준이며, 지수 하락만으로 외국인 순매도를 추정할 수 없습니다.","추가 검증 대상: 외국인·기관 순매수, 업종별 상승·하락 폭, 업종 거래대금, 대형주 지수 기여도. 수치와 출처가 확보된 경우에만 해당 항목의 해석을 발행합니다."]},
