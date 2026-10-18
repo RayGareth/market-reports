@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Create a Korean-market closing brief with Yahoo–Naver cross-source checks.
-The scheduled workflow runs at 17:00 Asia/Seoul on weekdays.
+The scheduled workflow runs at 18:00, 18:15 and 18:30 Asia/Seoul on weekdays.
 No new report is created if the exchange is closed, data missing, or sources disagree.
 """
 from __future__ import annotations
