@@ -60,3 +60,12 @@ html,body{color-scheme:light;background-color:#f7f5ef}
 .market-close-table .market-down{color:#416ca2;font-weight:700}
 .market-close-table .market-flat{color:#53645b;font-weight:700}
 @media(max-width:550px){.market-close-table th,.market-close-table td{padding:13px 3px;font-size:14px}}
+
+/* SECTION 05: mobile-friendly Ivory & Sage reading points */
+.reading-panel{display:flex;flex-direction:column;gap:0;margin-top:22px}
+.reading-item{padding:22px 5px;border-bottom:1px solid #cbd5c8}
+.reading-item:last-child{border-bottom:0}
+.reading-item.reading-featured{background:#e5e9df;border:1px solid #cbd5c8;border-radius:14px;padding:22px 24px;margin-bottom:8px}
+.report-article .reading-item h3{font-size:16px;line-height:1.55;color:#496b55;margin:0 0 9px;font-weight:800}
+.report-article .reading-item p{margin:0;line-height:1.9;color:#25362d;overflow-wrap:break-word}
+@media(max-width:550px){.reading-item{padding:19px 2px}.reading-item.reading-featured{padding:19px 18px}.report-article .reading-item h3{font-size:15px}}
