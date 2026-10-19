@@ -69,3 +69,16 @@ html,body{color-scheme:light;background-color:#f7f5ef}
 .report-article .reading-item h3{font-size:16px;line-height:1.55;color:#496b55;margin:0 0 9px;font-weight:800}
 .report-article .reading-item p{margin:0;line-height:1.9;color:#25362d;overflow-wrap:break-word}
 @media(max-width:550px){.reading-item{padding:19px 2px}.reading-item.reading-featured{padding:19px 18px}.report-article .reading-item h3{font-size:15px}}
+
+/* Mobile dashboard: prevent broken source labels and crowded navigation */
+.market-source{overflow-wrap:normal;word-break:keep-all;line-height:1.55}
+@media(max-width:550px){
+  .nav{min-height:68px;gap:10px;flex-wrap:wrap;justify-content:center;padding-top:12px;padding-bottom:12px}
+  .brand{font-size:18px;line-height:1.35;white-space:nowrap}
+  .navlinks{width:100%;justify-content:center;gap:clamp(12px,4vw,22px);font-size:13px;flex-wrap:wrap}
+  .navlinks a{white-space:nowrap}
+  .metric .market-source{font-size:11px;letter-spacing:-.2px}
+}
+@media(min-width:551px) and (max-width:720px){
+  .nav{gap:10px}.brand{font-size:18px}.navlinks{gap:12px}
+}
