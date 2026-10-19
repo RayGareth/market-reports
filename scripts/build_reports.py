@@ -29,6 +29,21 @@ def generate(doc):
             if len(rows)!=2 or [r["market"] for r in rows]!=["KOSPI","KOSDAQ"]: raise ValueError("Invalid market table")
             cells="".join('<tr><th scope="row">%s</th><td>%s</td><td class="%s">%+.2f%%</td></tr>'%(e(r["market"]),format(float(r["close"]),",.2f"),"market-up" if float(r["changePct"])>0 else "market-down" if float(r["changePct"])<0 else "market-flat",float(r["changePct"])) for r in rows)
             body='<p class="market-table-date">국내 · %s 확정 종가</p><div class="market-table-wrap"><table class="market-close-table"><thead><tr><th scope="col">시장</th><th scope="col">종가</th><th scope="col">등락률</th></tr></thead><tbody>%s</tbody></table></div>'%(e(mt["date"]),cells)
+        elif idx==4:
+            # SECTION 05: three readable learning points; retain a safe fallback.
+            labels=["오늘의 시장 해석","오늘의 경제 개념","오늘의 이해 포인트"]
+            cards=[]
+            for i,p in enumerate(section["paragraphs"]):
+                label=labels[i] if i<len(labels) else "추가 설명"
+                detail=p
+                if i==0 and p.startswith(label+" | "):
+                    detail=p[len(label)+3:]
+                elif i==1 and p.startswith(label+" · "):
+                    detail=p[len(label)+3:]
+                elif i==2 and p.startswith(label+" | "):
+                    detail=p[len(label)+3:]
+                cards.append('<div class="reading-item%s"><h3>%02d · %s</h3><p>%s</p></div>'%(" reading-featured" if i==0 else "",i+1,e(label),e(detail)))
+            body='<div class="reading-panel">%s</div>'%"".join(cards)
         elif idx==7:
             controls="".join('<label class="quiz-option"><input type="radio" name="answer" value="%s" required><span>%s</span></label>'%(i,e(opt)) for i,opt in enumerate(options))
             body='<div class="quiz"><form class="market-quiz" id="market-quiz" data-answer="%s"><fieldset><legend>%s</legend>%s</fieldset><div class="quiz-controls"><button class="button" type="submit">정답 확인</button><button type="reset" class="button-ghost">다시 풀기</button></div><div id="quiz-feedback" class="quiz-feedback" data-explanation="%s" role="status" aria-live="polite" hidden></div></form></div>'%(quiz["answer"],e(quiz["question"]),controls,e(quiz["explanation"]))
