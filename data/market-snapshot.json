@@ -1,24 +1,24 @@
 {
-  "updatedAt": "2026-10-19T18:34:28+09:00",
+  "updatedAt": "2026-10-20T18:31:43+09:00",
   "status": "confirmed_closes",
-  "note": "한국 2개 지수는 2026-10-19 Yahoo·네이버 종가 교차 점검. 미국 지수는 기존의 개별 기준일을 확인하세요. 실시간 데이터가 아닙니다.",
+  "note": "한국 2개 지수는 2026-10-20 Yahoo·네이버 종가 교차 점검. 미국 지수는 기존의 개별 기준일을 확인하세요. 실시간 데이터가 아닙니다.",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "date": "2026-10-19",
-      "close": 5768.01,
-      "changePct": 1.76,
+      "date": "2026-10-20",
+      "close": 5552.74,
+      "changePct": -3.73,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "date": "2026-10-19",
-      "close": 808.89,
-      "changePct": 1.78,
+      "date": "2026-10-20",
+      "close": 781.97,
+      "changePct": -3.33,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/"
     },
     {
@@ -42,10 +42,6 @@
   ],
   "history": {
     "kr": [
-      {
-        "date": "2026-10-02",
-        "value": 7003.74
-      },
       {
         "date": "2026-10-06",
         "value": 6941.39
@@ -81,6 +77,10 @@
       {
         "date": "2026-10-19",
         "value": 5768.01
+      },
+      {
+        "date": "2026-10-20",
+        "value": 5552.74
       }
     ],
     "us": [
