@@ -135,9 +135,9 @@ def main():
         lesson = "보합과 시장 비교"
         explanation = "보합과 상승·하락은 서로 다른 시장 흐름을 보여줍니다. 지수 변화만으로 원인을 확정할 수 없습니다."
     reading = [
-        f"오늘의 시장 해석 | 코스피 {kp:+.2f}%, 코스닥 {qp:+.2f}%로 {situation}했습니다. 두 지수의 등락률 차이는 {gap:.2f}%p입니다.",
+        f"오늘의 시장 해석 | 오늘은 {situation}한 날입니다. 지수의 방향을 먼저 확인하고 두 시장의 움직임이 같은지 비교해 보세요.",
         f"오늘의 경제 개념 · {lesson} | {explanation}",
-        "오늘의 이해 포인트 | 지수 등락률만으로 모든 종목의 방향이나 외국인·기관·개인의 매매 동향, 등락 원인을 판단할 수 없습니다."
+        "오늘의 이해 포인트 | 지수 등락률만으로 매매 주체별 수급이나 상승·하락의 원인을 단정할 수 없습니다. 추가 자료를 확인한 뒤 해석해야 합니다."
     ]
     sections=[
       {"title":"시장 온도: 정규장 종가","paragraphs":market_lines,"marketTable":{"date":weekday,"rows":[{"market":"KOSPI","close":kr["close"],"changePct":kr["changePct"]},{"market":"KOSDAQ","close":kq["close"],"changePct":kq["changePct"]}]}},
