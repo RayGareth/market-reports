@@ -75,8 +75,13 @@ def main():
         if not doc.get("publish"):continue
         if doc.get("verification")!="verified":raise ValueError(f"Not verified: {path.name}")
         if doc["date"]!=path.stem:raise ValueError(f"Filename mismatch: {path.name}")
-        (OUTPUT/(doc["date"]+".html")).write_text(generate(doc),encoding="utf-8")
+        target=OUTPUT/(doc["date"]+".html")
+        # Preserve published HTML, including any post-publication editorial edits.
+        if not target.exists():
+            target.write_text(generate(doc),encoding="utf-8")
+            print("Built",doc["date"])
+        else:
+            print("Preserved existing report",doc["date"])
         by_date[doc["date"]]={"date":doc["date"],"title":doc["headline"],"summary":doc["summary"],"market":doc.get("market",["kr","us"]),"tags":doc.get("tags",["정식 브리핑"]),"status":"published","url":"daily/"+doc["date"]+".html"}
-        print("Built",doc["date"])
     INDEX.write_text(json.dumps(sorted(by_date.values(),key=lambda r:r["date"],reverse=True),ensure_ascii=False,indent=2)+"\n",encoding="utf-8")
 if __name__=="__main__":main()
