@@ -37,7 +37,7 @@ def generate(doc):
             elif kp<0 and kq<0: headline="코스피와 코스닥, 동반 하락 마감"
             elif kp==0 and kq==0: headline="코스피와 코스닥, 모두 보합 마감"
             else: headline="코스피와 코스닥, 서로 다른 마감 흐름"
-            lead="코스피와 코스닥은 각각 %s(%+.2f%%), %s(%+.2f%%)로 마감했습니다. 두 시장의 종가를 비교해 보세요."%(format(float(rows[0]["close"]),",.2f"),kp,format(float(rows[1]["close"]),",.2f"),kq,direction(kp),direction(kq))
+            lead="코스피 %s(%+.2f%%), 코스닥 %s(%+.2f%%)로 마감했습니다. 두 지수는 각각 %s, %s 흐름이었습니다."%(format(float(rows[0]["close"]),",.2f"),kp,format(float(rows[1]["close"]),",.2f"),kq,direction(kp),direction(kq))
             gap=abs(kp-kq)
             if gap<0.005: compare="두 시장의 등락률은 표시 기준으로 같습니다."
             else: compare="%s의 등락률이 %s보다 %.2f%%p 높았습니다."%("코스피" if kp>kq else "코스닥","코스닥" if kp>kq else "코스피",gap)
