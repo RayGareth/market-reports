@@ -1,21 +1,10 @@
-name: Build Market Daily Reports
+name: Public report build disabled
 on:
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
-  build:
+  notice:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Build verified reports and archive
-        run: python3 scripts/build_reports.py
-      - name: Commit generated files
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/daily/ reports/index.json
-          if ! git diff --cached --quiet; then
-            git commit -m "Publish verified daily market reports"
-            git push
-          fi
+      - run: echo 'Detailed reports are now generated in the private repository.'
