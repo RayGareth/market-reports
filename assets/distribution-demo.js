@@ -1,0 +1,11 @@
+(()=>{'use strict';
+const countData={kospi:{up:460,flat:60,down:680},kosdaq:{up:360,flat:40,down:600}};
+const flowData={kospi:[{name:'개인',value:120},{name:'외국인',value:-85},{name:'기관',value:-35}],kosdaq:[{name:'개인',value:-30},{name:'외국인',value:20},{name:'기관',value:10}]};
+const fmt=n=>n.toLocaleString('ko-KR');
+const newEl=(tag,cls,txt)=>{const el=document.createElement(tag);if(cls)el.className=cls;if(txt!==undefined)el.textContent=txt;return el};
+function cards(target,entries){if(!target)return;target.replaceChildren();for(const e of entries){const card=newEl('div','distribution-card '+e.cls);card.append(newEl('span','distribution-label',e.label),newEl('strong',e.strongClass||'',e.value));if(e.note)card.append(newEl('small','',e.note));target.append(card)}}
+function drawCount(market){const v=countData[market];const total=v.up+v.flat+v.down;cards(document.getElementById('distribution-cards'),[{cls:'up',label:'상승',value:fmt(v.up)},{cls:'down',label:'하락',value:fmt(v.down)},{cls:'flat',label:'보합',value:fmt(v.flat)}]);const entries=[['상승',v.up,'up'],['보합',v.flat,'flat'],['하락',v.down,'down']];const p=document.getElementById('distribution-percentages');if(p){p.replaceChildren();for(const [label,val] of entries)p.append(newEl('span','',label+' '+(val/total*100).toFixed(1)+'%'))}const bar=document.getElementById('distribution-bar');if(bar){bar.replaceChildren();for(const [label,val,cls] of entries){const el=newEl('span',cls);el.style.width=(val/total*100)+'%';bar.append(el)}bar.setAttribute('aria-label',entries.map(([label,val])=>label+' '+(val/total*100).toFixed(1)+'%').join(', '))}const t=document.getElementById('distribution-total');if(t)t.textContent='가상 종목 수 합계 '+fmt(total)+'개 · DEMO'}
+function drawFlow(market){cards(document.getElementById('investor-cards'),flowData[market].map(x=>({cls:'',label:x.name,value:(x.value>0?'+':'')+fmt(x.value),strongClass:x.value>=0?'buy':'sell',note:'억 원 · '+(x.value>0?'순매수':x.value<0?'순매도':'보합')})))}
+for(const type of ['distribution','flow']){document.querySelectorAll('[data-'+type+'-market]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-'+type+'-market]').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));(type==='distribution'?drawCount:drawFlow)(btn.getAttribute('data-'+type+'-market'))}))}
+drawCount('kospi');drawFlow('kospi')
+})();
