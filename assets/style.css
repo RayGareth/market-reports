@@ -129,3 +129,10 @@ body{background:#f7f5ef}
   .framework-grid .panel p{word-break:keep-all;overflow-wrap:break-word}
   .metric .sub{font-size:11px;letter-spacing:-.15px}
 }
+
+/* Keep Project Demo link readable on narrow screens */
+.project-demo-link{white-space:nowrap;flex-shrink:0;display:inline-flex;align-items:center}
+@media(max-width:550px){
+  .section-title:has(.project-demo-link){align-items:flex-start;flex-wrap:wrap;column-gap:12px;row-gap:8px}
+  .section-title .project-demo-link{margin-top:2px;font-size:13px}
+}
