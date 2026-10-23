@@ -136,3 +136,46 @@ body{background:#f7f5ef}
   .section-title:has(.project-demo-link){align-items:flex-start;flex-wrap:wrap;column-gap:12px;row-gap:8px}
   .section-title .project-demo-link{margin-top:2px;font-size:13px}
 }
+
+/* Optional market distribution visualizations — illustrative DEMO only */
+.distribution-section .section-title{margin-bottom:17px}
+.distribution-section .section-title p{max-width:680px}
+.distribution-detail{padding:0;margin-bottom:12px;overflow:hidden}
+.distribution-detail>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:19px 23px;font-weight:800;font-size:17px}
+.distribution-detail>summary::-webkit-details-marker{display:none}
+.distribution-detail>summary:before{content:"▸";color:var(--accent);margin-right:3px}
+.distribution-detail[open]>summary:before{content:"▾"}
+.distribution-detail>summary .detail-hint{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
+.distribution-detail[open]>summary{border-bottom:1px solid #e1e8dc}
+.distribution-content{padding:20px 23px 23px}
+.distribution-switch{display:inline-flex;gap:5px;background:#edf0ea;border-radius:11px;padding:4px;margin-bottom:20px}
+.distribution-tab{border:0;background:transparent;color:var(--muted);padding:9px 24px;border-radius:8px;font-weight:700}
+.distribution-tab[aria-pressed=true]{background:#688c76;color:#fff}
+.distribution-cards,.investor-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.distribution-card{padding:18px 12px;border-radius:15px;text-align:center;background:#f6f7f3;min-width:0}
+.distribution-card.up{background:#fae9e9;color:#aa4050}
+.distribution-card.down{background:#e9effa;color:#416c9a}
+.distribution-card.flat{background:#f0f1f0;color:#596861}
+.distribution-card .distribution-label{display:block;font-size:13px}
+.distribution-card strong{display:block;font-size:clamp(20px,2.7vw,30px);line-height:1.5;font-variant-numeric:tabular-nums}
+.distribution-card small{font-size:11px;display:block}
+.distribution-percentages{display:flex;justify-content:space-between;gap:8px;margin-top:17px;color:var(--muted);font-size:12px;flex-wrap:wrap}
+.distribution-bar{display:flex;width:100%;height:12px;overflow:hidden;border-radius:99px;background:#e6e8e2;margin-top:8px}
+.distribution-bar span.up{background:#b84d59}.distribution-bar span.flat{background:#aeb8b0}.distribution-bar span.down{background:#416c9a}
+.distribution-total{font-size:12px;text-align:center;margin:10px 0 14px;color:var(--muted)}
+.demo-footnote{font-size:12px;color:#52665b;margin:10px 0;line-height:1.7}
+.analysis-boundary{font-size:12px;color:#64766b;margin:8px 0 0;line-height:1.7}
+.investor-cards .distribution-card{background:#f7f8f4;border:1px solid #dce4d9}
+.investor-cards .distribution-card strong.buy{color:#aa4050}.investor-cards .distribution-card strong.sell{color:#416c9a}
+@media(max-width:550px){
+.distribution-detail>summary{padding:17px 15px;font-size:15px;gap:7px}
+.distribution-detail>summary .detail-hint{font-size:10px;max-width:125px}
+.distribution-content{padding:17px 14px 19px}
+.distribution-switch{display:flex;width:100%}
+.distribution-tab{flex:1;padding:10px 7px}
+.distribution-cards,.investor-cards{gap:7px}
+.distribution-card{padding:15px 5px}
+.distribution-card strong{font-size:clamp(17px,5.4vw,25px)}
+.distribution-card .distribution-label{font-size:12px}
+.distribution-percentages{font-size:11px}
+}
