@@ -90,3 +90,33 @@ html,body{color-scheme:light;background-color:#f7f5ef}
 .report-article .market-flow p{margin:9px 0 0;line-height:1.85;color:#25362d}
 .report-article .market-flow .market-flow-note{font-size:12px;color:#53665a}
 @media(max-width:550px){.market-flow{padding:17px 16px}.market-flow strong{font-size:16px}}
+
+
+/* Market Daily · Notion-inspired Ivory & Sage dashboard, 2026-10-23 */
+body{background:#f7f5ef}
+.site-header{background:rgba(247,245,239,.96)}
+.hero{padding:62px 0 25px}
+.hero h1{font-size:clamp(38px,5.1vw,60px);letter-spacing:-1.9px;line-height:1.22;margin:13px 0 15px}
+.hero .lead{margin:0 0 18px;max-width:610px;font-size:16px;line-height:1.85}
+.section{margin:42px 0}
+.section-title h2{font-size:25px}
+.panel{background:#fffdf9;border:1px solid #e0e5db;border-radius:18px;box-shadow:0 5px 22px rgba(53,77,60,.035)}
+.metric{min-height:155px}
+.metric strong{color:#25362d;font-size:29px}
+.market-reading-grid .panel{background:#fffdf9}
+.market-date-details{margin-bottom:17px}
+.quick-access{margin-top:24px}
+.quick-access-card{display:flex;align-items:center;gap:20px;padding:27px 28px;background:#e5e9df;border:1px solid #d7e0d2;border-radius:19px}
+.quick-access-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:13px;background:#f7f5ef;color:#688c76;font-size:29px;flex:0 0 auto}
+.quick-access-copy{flex:1;min-width:0}
+.quick-access-copy .eyebrow{font-size:11px;letter-spacing:1.5px}
+.quick-access-copy h2{font-size:22px;line-height:1.4;margin:6px 0}
+.quick-access-copy p{margin:3px 0;color:#526458}
+.quick-access-copy .quick-access-note{font-size:12px;color:#53665a;margin-top:9px}
+.quick-access-action{white-space:nowrap;text-align:center}
+.archive-teaser{display:flex;align-items:center;justify-content:space-between;gap:16px;background:#fffdf9;border:1px solid #e0e5db;border-radius:16px;padding:19px 24px;margin-top:13px}
+.archive-teaser strong{display:block;font-size:15px}
+.archive-teaser small{display:block;margin-top:3px;color:#64776b;font-size:12px}
+.archive-teaser>span:last-child{color:#688c76;font-size:22px}
+@media(max-width:700px){.quick-access-card{flex-wrap:wrap;gap:12px;padding:20px}.quick-access-icon{width:44px;height:44px;font-size:25px}.quick-access-copy{flex-basis:calc(100% - 60px)}.quick-access-action{width:100%;margin-top:4px}.hero{padding-top:39px}.metric{min-height:145px}}
+@media(max-width:550px){.hero h1{font-size:38px}.section{margin:35px 0}.metric strong{font-size:24px}.archive-teaser{padding:17px 18px}}
