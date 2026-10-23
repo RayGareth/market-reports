@@ -120,3 +120,12 @@ body{background:#f7f5ef}
 .archive-teaser>span:last-child{color:#688c76;font-size:22px}
 @media(max-width:700px){.quick-access-card{flex-wrap:wrap;gap:12px;padding:20px}.quick-access-icon{width:44px;height:44px;font-size:25px}.quick-access-copy{flex-basis:calc(100% - 60px)}.quick-access-action{width:100%;margin-top:4px}.hero{padding-top:39px}.metric{min-height:145px}}
 @media(max-width:550px){.hero h1{font-size:38px}.section{margin:35px 0}.metric strong{font-size:24px}.archive-teaser{padding:17px 18px}}
+
+/* Mobile legibility: demo metrics and four analytical perspectives */
+.metric .sub{display:block;line-height:1.45;word-break:keep-all;overflow-wrap:normal}
+@media(max-width:550px){
+  .framework-grid{grid-template-columns:1fr;gap:12px}
+  .framework-grid .panel{padding:19px 21px}
+  .framework-grid .panel p{word-break:keep-all;overflow-wrap:break-word}
+  .metric .sub{font-size:11px;letter-spacing:-.15px}
+}
