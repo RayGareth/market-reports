@@ -1,51 +1,33 @@
 # Market Daily 🌿
 
-Ivory & Sage 테마의 국내·미국 시장 리서치 대시보드.
+Ivory & Sage 테마의 시장 학습 프로젝트입니다.
 
-- [웹사이트](https://raygareth.github.io/market-reports/)
-- [리포트 아카이브](https://raygareth.github.io/market-reports/reports/)
+- [대시보드](https://raygareth.github.io/market-reports/) — 명확히 표시한 가상 데이터 시연
+- [개인 리포트 아카이브](https://raygareth.github.io/market-reports/reports/) — 비공개 연결 후 날짜·키워드 검색과 상세 열람
+- [최신 상세 바로 열기](https://raygareth.github.io/market-reports/reports/?open=latest)
 
-## 공통 리포트 템플릿
+## 개인 리포트 열람
 
-앞으로 발행할 리포트는 `content/daily/YYYY-MM-DD.json` 원고를 이용해 `scripts/build_reports.py`가 HTML로 생성합니다.
+GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens에서 `RayGareth/market-reports-private`만 선택하고 **Contents: Read-only** 권한, 적절한 만료일로 발급합니다. 토큰을 아카이브의 비공개 연결란에 입력하면 날짜별 목록을 불러옵니다. 연결 후 날짜를 한 번 누르면 상세 리포트와 복습 퀴즈가 같은 화면에서 열립니다. `?open=latest`로 진입하면 연결 후 최신 발행본을 바로 엽니다.
 
-- 8개 고정 섹션, Sage 구분선, 객관식 선택 → 정답 확인 → 해설 → 다시 풀기 기능
-- 기존 CSS `assets/style.css` 및 퀴즈 엔진 `assets/quiz.js` 공통 사용
-- `reports/index.json`에서 아카이브 목록 자동 생성
-- `content/daily/2026-10-13.json`은 **발행되지 않는 예시 초안**입니다.
+GitHub 로그인과 이 연결은 별개입니다. 토큰은 GitHub API의 고정된 비공개 저장소 읽기 요청에만 전송합니다. 토큰·리포트는 탭 메모리에서만 사용하며 URL, localStorage, sessionStorage, 공개 저장소에 저장하지 않습니다. 새로고침·탭 종료 후에는 재연결이 필요합니다. **토큰을 채팅·PR·커밋에 남기지 마세요.**
 
-### 리포트 발행 절차
+연결 전 공개 페이지에는 실제 시황 수치·개인 리포트 목록이 없습니다. 연결 해제는 토큰·목록·열린 상세를 지웁니다. 권한 미확인 실제 데이터는 이 저장소에 복사하거나 Pages로 배포하지 않습니다. 비공개 저장소의 기존 Actions 다운로드 리더도 사용할 수 있습니다.
 
-1. 해당 거래일의 종가·거래일·수급·뉴스 출처를 확인합니다.
-2. `content/daily/YYYY-MM-DD.json`에 검증한 원고를 채웁니다.
-3. `publish: true` 및 `verification: "verified"`를 설정합니다.
-4. GitHub 저장소 → **Actions** → **Build Market Daily Reports** → **Run workflow**를 실행합니다.
-5. GitHub Pages 자동 배포가 완료되면 HTML과 아카이브가 공개됩니다.
+## 발행 구조
 
-로컬에서 테스트할 때는 `python3 scripts/build_reports.py`를 실행할 수 있습니다.
+기존 수집·검증·생성·발행 코드는 변경하지 않습니다. 비공개 저장소가 생성하는 `reports/index.json`, `reports/daily/YYYY-MM-DD.html`, `assets/style.css`를 연결 시 읽으며 새로운 날짜를 공개 저장소에 수동 복사할 필요가 없습니다. 목록 새로고침으로 최신 발행본을 확인할 수 있습니다.
 
-> 중요: GitHub Actions 발행 공통 생성 워크플로는 **수동 실행**이며, 별도 오후 5시 예약 발행 워크플로가 있습니다. 자동 자료 수집과 예약 실행은 추가됐지만 첫 실제 성공 여부를 확인해야 합니다. 뉴스 분석은 수동 보강 대상입니다. 검증되지 않은 숫자를 임의로 채우지 않습니다.
+공개 저장소의 `scripts/`는 기존 코드 보존용입니다. 데이터 검증 성공은 공개 재게시 권한을 뜻하지 않습니다. 실제 데이터와 리포트를 이 저장소에 추가하지 마세요.
 
-기존 2026-10-12 리포트는 오후 작성판으로 국내 **10월 8일 확정 종가**를 사용하고 있습니다. 국내 **10월 12일 마감 종가로 갱신한 버전은 아직 아닙니다**.
+## 검증
 
-## 거래일 오후 5시(KST) 자동 발행 — 계정 없는 교차 검증
+브라우저 동작 검증은 Playwright와 Chromium을 사용합니다. 실제 인증 정보나 시장 데이터 없이 GitHub API 응답을 가상 자료로 대체해 실행합니다. 아래 테스트는 별도의 발행 워크플로를 추가하거나 실행하지 않습니다.
 
-- 자동 실행 시간: 월~금 **17:00, 17:15, 17:30 KST** (최초 17:00 실행, 데이터 지연 시 재시도) — GitHub Actions 지연 가능
-- 1차 데이터: Yahoo Finance `^KS11` (KOSPI), `^KQ11` (KOSDAQ)의 일별 OHLC
-- 2차 데이터: 네이버 금융 일별 지수 가격 공개 엔드포인트 (`KOSPI`, `KOSDAQ`)
-- 검증: **당일 날짜가 두 출처에 모두 있어야 하고**, 지수 종가 차이가 0.05% 또는 최소 0.5포인트 이내여야 함
-- 이외 Yahoo OHLC의 숫자 유효성, 고가/저가 범위, 직전 종가, 비정상 변동률 검사
-- 어느 한쪽이 차단·지연되거나 수치가 다르면 **발행 중단**, 기존 리포트 유지
-- 검증 성공: 8개 섹션과 선택형 퀴즈로 HTML 생성 → 아카이브·대시보드 갱신
-- 미국 지수·뉴스·외국인/기관 수급은 현재 자동 검증 대상이 아님
-- KRX 계정·GitHub Secrets·비밀번호 **필요 없음**
+```sh
+npm install --no-save playwright
+npx playwright install chromium
+node tests/private-reader.cjs
+```
 
-**주의:** Yahoo Finance와 네이버 금융 모두 비공식 공개 데이터 접근 방식입니다. 서비스 정책, 지연, 종가 정의 및 데이터 변경에 따라 실패할 수 있고, 두 서비스 간 일치가 공식 거래소 보증을 의미하지는 않습니다. 이 도구는 발행 오류 예방을 위한 데이터 품질 장치입니다.
-
-[GitHub Actions 실행 기록](https://github.com/RayGareth/market-reports/actions)에서 오늘 오후 5시 작업 완료 여부를 확인하세요. 첫 자동 실행은 아직 확인되지 않았으며, 작업이 정상 실행되어야 10월 12일 국내 종가가 기존 오후 브리핑을 대체합니다.
-
-### 안정화 운영 규칙
-
-- 17:00 발행이 지연될 수 있으므로 17:15, 17:30에도 검증을 다시 시도합니다. 동일 날짜의 검증된 원고는 재생성할 수 있으며 아카이브는 날짜 키로 중복을 막습니다.
-- 양쪽 데이터 모두 당일 종가가 없으면 휴장 또는 반영 지연으로 판단하여 **새 원고 없이 종료**합니다. 한쪽만 누락되거나 서로 다르면 발행을 중단합니다.
-- 발행 워크플로의 실제 성공 여부는 GitHub Actions 실행 기록으로 확인해야 하며, 스케줄을 추가했다고 해서 실행 성공이 입증되는 것은 아닙니다.
+모바일 Chromium 에뮬레이션과 실제 Android 기기의 동작 확인은 구분합니다. 실제 GitHub 토큰 연결은 사용자가 발급한 토큰으로 배포 후 확인해야 합니다.
