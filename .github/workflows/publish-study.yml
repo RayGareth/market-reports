@@ -33,6 +33,7 @@ jobs:
           python scripts/publish_public_study.py
         env:
           TZ: Asia/Seoul
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
           FSC_API_KEY: ${{ secrets.FSC_API_KEY }}
       - name: Reload published main for Pages
         if: vars.MARKET_PAGES_DEPLOY == 'true'

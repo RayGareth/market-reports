@@ -25,9 +25,9 @@ def number(value):
         raise ValueError('Non-finite numeric field')
     return result
 
-def get_text(url, params=None):
+def get_text(url, params=None, headers=None):
     import requests
-    response = requests.get(url, params=params, headers={'User-Agent':'MarketDaily/1.0 (end-of-day verification)'}, timeout=(8, 20), allow_redirects=False)
+    response = requests.get(url, params=params, headers={'User-Agent':'MarketDaily/1.0 (end-of-day verification)', **(headers or {})}, timeout=(8, 20), allow_redirects=False)
     if response.status_code != 200:
         raise RuntimeError('Provider unavailable')
     return response.text
@@ -63,6 +63,48 @@ def parse_fsc(text, instrument):
         result.append(Bar(day, close, number(r['fltRt'])))
     return result
 
+def parse_krx(text, instrument):
+    rows = json.loads(text)['OutBlock_1']
+    if not isinstance(rows, list):
+        raise ValueError('Unexpected KRX response')
+    expected = {'kospi':'코스피', 'kosdaq':'코스닥'}[instrument]
+    result = []
+    for row in rows:
+        if row.get('IDX_NM') != expected:
+            continue
+        close, low, high = (number(row[k]) for k in ('CLSPRC_IDX','LWPRC_IDX','HGPRC_IDX'))
+        if not 0 < low <= close <= high or number(row['OPNPRC_IDX']) <= 0:
+            raise ValueError('Inconsistent OHLC')
+        result.append(Bar(date.fromisoformat(row['BAS_DD']).isoformat(), close, number(row['FLUC_RT'])))
+    return result
+
+
+def fetch_pair(adapter, instrument, target, previous):
+    # KRX accepts one session per request; avoid 45 calendar-day requests.
+    if hasattr(adapter, 'fetch_pair'):
+        return adapter.fetch_pair(instrument, target, previous)
+    return adapter.fetch(instrument, target)
+
+
+class KrxProvider:
+    def __init__(self, transport=get_text):
+        self.transport = transport
+
+    def fetch_pair(self, instrument, target, previous):
+        key = os.environ.get('KRX_API_KEY')
+        if not key:
+            raise RuntimeError('Provider credentials unavailable')
+        endpoint = {'kospi':'kospi_dd_trd', 'kosdaq':'kosdaq_dd_trd'}[instrument]
+        rows = []
+        for day in (target, previous):
+            text = self.transport('https://data-dbg.krx.co.kr/svc/apis/idx/' + endpoint,
+                                  {'basDd':day.strftime('%Y%m%d')}, headers={'AUTH_KEY':key})
+            parsed = parse_krx(text, instrument)
+            if any(bar.day != day.isoformat() for bar in parsed):
+                raise ValueError('KRX response session differs from request')
+            rows.extend(parsed)
+        return rows
+
 class Provider:
     def __init__(self, name, transport=get_text):
         self.name, self.transport = name, transport
@@ -94,3 +136,5 @@ class Provider:
         raise ValueError('Unknown provider adapter')
 
 ADAPTERS = {name:Provider(name) for name in ['yahoo','naver','fred','fsc']}
+
+ADAPTERS['krx'] = KrxProvider()

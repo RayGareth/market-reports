@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
 try:
-    from .market_sources import ADAPTERS
+    from .market_sources import ADAPTERS, fetch_pair
     from .collect_close import cross_check
 except ImportError:
-    from market_sources import ADAPTERS
+    from market_sources import ADAPTERS, fetch_pair
     from collect_close import cross_check
 
 INSTRUMENTS = {
@@ -19,6 +19,7 @@ INSTRUMENTS = {
 MESSAGES = {
     'rights_pending':'공개 게시 근거 확인 대기',
     'calendar_unavailable':'거래일 달력 확인이 필요합니다',
+    'verification_unavailable':'비교 출처의 검증 자료가 없습니다',
     'missing':'최근 마감 자료가 아직 반영되지 않았습니다',
     'provider_error':'데이터를 확인하지 못했습니다',
     'disagreement':'출처 간 수치가 달라 표시를 보류합니다',
@@ -89,7 +90,7 @@ def collect(config, now=None, adapters=None, calendar=session_pair):
             if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []):
                 continue
             try:
-                good[name] = checked_pair(adapters[name].fetch(instrument, target), target, previous)
+                good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
             except LookupError:
                 errors.append('missing')
             except ValueError:
@@ -103,6 +104,8 @@ def collect(config, now=None, adapters=None, calendar=session_pair):
             a, prev_a, pct_a = good[primary]
             checkers = [(name, config['providers'][name]) for name in good if name != primary and config['providers'][name].get('family') != policy.get('family')]
             if not checkers:
+                if not errors:
+                    failure = 'verification_unavailable'
                 continue
             try:
                 for other, other_policy in checkers:

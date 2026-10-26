@@ -10,7 +10,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 import market_close as app
-from market_sources import Bar, Provider, parse_fred, parse_naver, parse_fsc
+from market_sources import Bar, Provider, parse_fred, parse_naver, parse_fsc, parse_krx, KrxProvider
 import build_public_reports as builder
 
 NOW=datetime.fromisoformat('2026-10-26T09:00:00+00:00')
@@ -91,6 +91,36 @@ class CloseTests(unittest.TestCase):
             provider=Provider('fsc',lambda url,params:captured.append((url,params)) or text)
             provider.fetch('kospi',date(2026,10,26))
             self.assertIn('_V2',captured[0][0]);self.assertEqual(captured[0][1]['idxNm'],'코스피')
+
+    def test_krx_exact_index_sessions_headers_and_rate(self):
+        calls=[]
+        def transport(url, params, headers=None):
+            calls.append((url,params,headers))
+            return json.dumps({'OutBlock_1':[{'IDX_NM':'코스피','BAS_DD':params['basDd'],'CLSPRC_IDX':'101' if params['basDd']=='20261026' else '100','LWPRC_IDX':'99','HGPRC_IDX':'102','OPNPRC_IDX':'100','FLUC_RT':'1'}, {'IDX_NM':'코스피 200'}]})
+        with patch.dict('os.environ',{'KRX_API_KEY':'TEST_ONLY'}):
+            bars=KrxProvider(transport).fetch_pair('kospi',date(2026,10,26),date(2026,10,23))
+        self.assertEqual(app.checked_pair(bars,date(2026,10,26),date(2026,10,23)),(101,100,1.0000000000000009))
+        self.assertEqual(len(calls),2)
+        self.assertEqual(calls[0][2],{'AUTH_KEY':'TEST_ONLY'})
+        self.assertNotIn('TEST_ONLY',calls[0][0])
+        with self.assertRaises(KeyError):parse_krx('{"error":"not_authorized"}','kospi')
+        with patch.dict('os.environ',{'KRX_API_KEY':'TEST_ONLY'}):
+            with self.assertRaises(ValueError):
+                KrxProvider(lambda *a,**kw:transport(a[0],{'basDd':'20261022'})).fetch_pair('kospi',date(2026,10,26),date(2026,10,23))
+
+    def test_diagnostic_is_separate_from_public_rights_and_redacts_prices(self):
+        from check_market_connection import diagnose
+        cfg=config()
+        cfg['providers']['primary']['public']['display']=False
+        adapters={'primary':Fake(),'check':Fake()}
+        result=diagnose(cfg,NOW,adapters)
+        self.assertEqual(result['instruments'][0]['crossCheck'],'passed')
+        self.assertFalse(result['publicDataWritten'])
+        self.assertNotIn('101',json.dumps(result))
+        self.assertEqual(app.collect(cfg,NOW,adapters,calendar)['indices'],[])
+        broken=diagnose(cfg,NOW,{'primary':Fake(error=RuntimeError('SECRET_PRICE_9876')),'check':Fake()})
+        self.assertNotIn('SECRET_PRICE',json.dumps(broken))
+        self.assertNotIn('9876',json.dumps(broken))
 
     def test_late_data_revision_preserves_original_and_retry_is_idempotent(self):
         market=app.collect(config(),NOW,{'primary':Fake(),'check':Fake()},calendar)

@@ -96,7 +96,7 @@ def generate(doc):
                 overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
             for row in rows:
-                overview += '<p class="sub">' + esc(row['name']) + ' · <a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '종가 출처')) + ' ↗</a>'
+                overview += '<p class="sub">확정 종가 · 교차 검증 완료 · ' + esc(row['name']) + ' · <a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '종가 출처')) + ' ↗</a>'
                 if row.get('verificationSource'):
                     overview += ' · <a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">교차 검증: ' + esc(row.get('verificationSourceName', '출처')) + ' ↗</a>'
                 if row.get('previousAsOf'):
