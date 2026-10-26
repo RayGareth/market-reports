@@ -47,3 +47,11 @@ node tests/public-reader.cjs
 ```
 
 모바일 Chromium 화면 검증과 실제 Android 기기 확인은 구분합니다. PR 병합·배포·실제 예약 발행은 별도로 확인해야 합니다.
+
+## PR #1 최종 점검 보완
+
+공개/비공개 예약은 별도 저장소를 쓰므로 직접 파일 충돌은 없습니다. 전환 기간 동안 두 작업이 같은 시간대에 실행되는 것은 유지합니다. 공개 작업은 `market-daily-public` 동시 실행 그룹으로 직렬화하고 main에서만 실행합니다.
+
+발행 직전에 최신 main으로 임시 git worktree를 만들고, push가 경쟁 수정으로 거부되면 최대 세 번 최신 main에서 다시 생성합니다. 생성 파일을 rebase하거나 강제 push하지 않으며 원래 체크아웃도 변경하지 않습니다. 기존 날짜 원고/HTML과 기존 아카이브 항목을 보존합니다.
+
+GitHub의 GITHUB_TOKEN으로 만든 커밋은 브랜치 방식 Pages 빌드를 자동으로 시작하지 않습니다. 예약 발행 후 실제 배포를 위해 승인 이후 Pages Source를 GitHub Actions로 설정하고 repository variable `MARKET_PAGES_DEPLOY=true`를 지정하면 준비된 Pages 배포 단계를 사용합니다. 이 전환 전에는 커밋 성공과 사이트 갱신 성공을 구분해야 합니다. 이번 작업은 설정 변경·병합·배포를 실행하지 않습니다.

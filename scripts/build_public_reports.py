@@ -127,6 +127,9 @@ def build(root, day, backfill=False):
     if not target.exists():
         target.write_text(rendered)
     # Rebuild only from this public-safe schema; never copy the private index.
+    old_index = root / 'reports/index.json'
+    previous = json.loads(old_index.read_text()) if old_index.exists() else []
+    by_date = {r['date']: r for r in previous if r.get('url') == 'daily/' + r.get('date', '') + '.html' and (root / 'reports' / r['url']).is_file()}
     entries = []
     for path in sorted((root / 'content/daily').glob('*.json'), reverse=True):
         item = json.loads(path.read_text())
@@ -135,11 +138,12 @@ def build(root, day, backfill=False):
         validate(item)
         if (root / 'reports/daily' / (item['date'] + '.html')).exists():
             entries.append({'date': item['date'], 'title': item['headline'], 'summary': item['summary'], 'market': ['kr', 'us'], 'tags': ['공개 학습판', item['lesson']['term']], 'status': 'published', 'url': 'daily/' + item['date'] + '.html'})
-    entries.sort(key=lambda r: r['date'], reverse=True)
+    by_date.update({r['date']: r for r in entries})
+    entries = sorted(by_date.values(), key=lambda r: r['date'], reverse=True)
     (root / 'reports/index.json').write_text(json.dumps(entries, ensure_ascii=False, indent=2) + '\n')
     if entries:
         # A real fallback page works without JavaScript, no redirect race.
-        latest_day = entries[0]['date']
+        latest_day = next(r['date'] for r in entries if (root / 'content/daily' / (r['date'] + '.json')).exists())
         latest_doc = json.loads((root / 'content/daily' / (latest_day + '.json')).read_text())
         latest_html = (root / 'reports/daily' / (latest_day + '.html')).read_text()
         alias = latest_html.replace('href="../../', 'href="../').replace('src="../../', 'src="../')
