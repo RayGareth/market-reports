@@ -1,0 +1,38 @@
+name: Public Daily Study at 18 KST
+on:
+  schedule:
+    - cron: '0 9 * * 1-5'
+    - cron: '15 9 * * 1-5'
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: market-daily-public-study
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check public template and data permissions
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Build original public study note (no private data access)
+        run: python scripts/build_public_reports.py
+        env:
+          TZ: Asia/Seoul
+      - name: Commit public study files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add content/daily/ reports/daily/ reports/index.json reports/latest.html data/public-market.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish public daily study $(TZ=Asia/Seoul date +%F)"
+            git pull --rebase origin main
+            git push origin HEAD:main
+          fi

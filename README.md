@@ -1,33 +1,49 @@
 # Market Daily 🌿
 
-Ivory & Sage 테마의 시장 학습 프로젝트입니다.
+개인 경제 공부와 시황 기록을 위한 간편한 Daily Report입니다. 기존 Ivory & Sage 디자인을 사용합니다.
 
-- [대시보드](https://raygareth.github.io/market-reports/) — 명확히 표시한 가상 데이터 시연
-- [개인 리포트 아카이브](https://raygareth.github.io/market-reports/reports/) — 비공개 연결 후 날짜·키워드 검색과 상세 열람
-- [최신 상세 바로 열기](https://raygareth.github.io/market-reports/reports/?open=latest)
+- [대시보드](https://raygareth.github.io/market-reports/)
+- [날짜별 아카이브](https://raygareth.github.io/market-reports/reports/)
+- [최신 리포트](https://raygareth.github.io/market-reports/reports/latest.html)
 
-## 개인 리포트 열람
+로그인·토큰·다운로드 없이 날짜를 클릭해 공개 학습판을 바로 읽습니다. 최신 링크는 JavaScript가 없어도 작동하는 실제 HTML 파일입니다.
 
-GitHub Settings → Developer settings → Personal access tokens → Fine-grained tokens에서 `RayGareth/market-reports-private`만 선택하고 **Contents: Read-only** 권한, 적절한 만료일로 발급합니다. 토큰을 아카이브의 비공개 연결란에 입력하면 날짜별 목록을 불러옵니다. 연결 후 날짜를 한 번 누르면 상세 리포트와 복습 퀴즈가 같은 화면에서 열립니다. `?open=latest`로 진입하면 연결 후 최신 발행본을 바로 엽니다.
+## 네 개의 SECTION
 
-GitHub 로그인과 이 연결은 별개입니다. 토큰은 GitHub API의 고정된 비공개 저장소 읽기 요청에만 전송합니다. 토큰·리포트는 탭 메모리에서만 사용하며 URL, localStorage, sessionStorage, 공개 저장소에 저장하지 않습니다. 새로고침·탭 종료 후에는 재연결이 필요합니다. **토큰을 채팅·PR·커밋에 남기지 마세요.**
+1. **오늘의 시장 한눈에 보기**: 국내외 지수별 확정 종가·등락률·기준일, 코스피·코스닥 종목 분포. 검증과 공개 게시 근거가 모두 갖춰진 자료만 표시합니다.
+2. **오늘의 주요 이슈와 시장 흐름**: 확인된 사실과 작성자의 해석을 구분하고 원문 출처를 연결합니다.
+3. **오늘의 경제 공부**: 직접 작성한 개념 한 가지와 쉬운 일상 연결 설명. 참고 자료는 Investor.gov의 Introduction to Investing입니다.
+4. **오늘의 복습 퀴즈**: 객관식 선택·정답 확인·해설·다시 풀기.
 
-연결 전 공개 페이지에는 실제 시황 수치·개인 리포트 목록이 없습니다. 연결 해제는 토큰·목록·열린 상세를 지웁니다. 권한 미확인 실제 데이터는 이 저장소에 복사하거나 Pages로 배포하지 않습니다. 비공개 저장소의 기존 Actions 다운로드 리더도 사용할 수 있습니다.
+상대 강도 분석·투자 시나리오·액션 플랜은 새 공개 템플릿에 포함하지 않습니다.
 
-## 발행 구조
+현재 실제 종가·종목 분포·당일 뉴스 데이터는 **미연결**입니다. 빈 항목을 가상의 시세나 추정 뉴스로 채우지 않습니다. 기존 날짜에 새로 작성한 학습판은 원본 상세 리포트의 재게시나 과거 시황 재구성이 아닙니다.
 
-기존 수집·검증·생성·발행 코드는 변경하지 않습니다. 비공개 저장소가 생성하는 `reports/index.json`, `reports/daily/YYYY-MM-DD.html`, `assets/style.css`를 연결 시 읽으며 새로운 날짜를 공개 저장소에 수동 복사할 필요가 없습니다. 목록 새로고침으로 최신 발행본을 확인할 수 있습니다.
+## 공개 게시와 보존
 
-공개 저장소의 `scripts/`는 기존 코드 보존용입니다. 데이터 검증 성공은 공개 재게시 권한을 뜻하지 않습니다. 실제 데이터와 리포트를 이 저장소에 추가하지 마세요.
+- `content/daily/`의 공개 학습 원고 → `scripts/build_public_reports.py` → `reports/daily/`, `reports/index.json`, `reports/latest.html`, `data/public-market.json`.
+- 수치와 뉴스 입력에는 `verified: true`, `publication.status: approved_public`, 공개 근거 URL(`publication.evidence`), 출처(`source`)가 필요합니다. 지수·분포에는 개별 기준일(`asOf`)도 필요합니다. 미확인 입력은 HTML 생성 전에 거부합니다. 이 표시는 실제 권한 확인을 대신하지 않으며 편집자가 근거를 확인해야 합니다.
+- 미확인 원자료는 공개 원고·커밋·PR에 넣지 마세요. 렌더러가 숨겨도 공개 저장소 파일은 공개됩니다.
+- 기존 날짜 HTML을 자동으로 덮어쓰지 않습니다. 기존 비공개 원고·리포트·Actions 기록은 이동하거나 삭제하지 않습니다.
+- 공개 아카이브의 학습판은 원본에서 날짜만 참고하고 수치·헤드라인·본문·퀴즈를 가져오지 않고 새로 작성했습니다.
+
+## 자동 발행과 단계적 전환
+
+기존 두 저장소의 워크플로 파일과 일정은 변경하지 않습니다. 공개 저장소의 기존 워크플로는 비활성 안내용이고 실제 발행은 비공개 저장소의 평일 18:00·18:15·18:30 KST 작업입니다.
+
+새 `publish-study.yml`은 같은 시간대에 공개 학습판을 생성합니다. 외부 시세 API나 비공개 저장소에 접근하지 않고, 기본 라이브러리만 사용합니다. 현재는 직접 작성한 네 가지 학습 개념을 순환합니다. 평일 학습판이므로 국내 휴장일에도 생성할 수 있으며 거래일 리포트로 표시하지 않습니다. 재실행해도 같은 날짜의 원고/상세는 보존합니다. 주말 수동 실행은 새 날짜를 생성하지 않습니다. GitHub Actions 지연 가능성이 있습니다.
+
+이 PR을 기본 브랜치에 병합한 후 예약 발행과 Pages 배포가 실제로 성공하는지 확인해야 합니다. 현재 운영 성공을 보장한 상태는 아닙니다.
+
+비공개 저장소는 기록 보존용으로 유지합니다. 공개 학습판의 연속 발행을 확인한 뒤 기존 비공개 예약 중단을 검토합니다. **이번 PR은 비공개 예약을 중단하지 않습니다.** 실제 지표와 뉴스 연결, 비공개 운영 중단은 남은 작업입니다.
 
 ## 검증
 
-브라우저 동작 검증은 Playwright와 Chromium을 사용합니다. 실제 인증 정보나 시장 데이터 없이 GitHub API 응답을 가상 자료로 대체해 실행합니다. 아래 테스트는 별도의 발행 워크플로를 추가하거나 실행하지 않습니다.
-
 ```sh
-npm install --no-save playwright
-npx playwright install chromium
-node tests/private-reader.cjs
+python -m unittest discover -s tests -p 'test_*.py'
+python scripts/build_public_reports.py --date 2026-10-26
+# Playwright/Chromium을 설치한 환경에서:
+node tests/public-reader.cjs
 ```
 
-모바일 Chromium 에뮬레이션과 실제 Android 기기의 동작 확인은 구분합니다. 실제 GitHub 토큰 연결은 사용자가 발급한 토큰으로 배포 후 확인해야 합니다.
+모바일 Chromium 화면 검증과 실제 Android 기기 확인은 구분합니다. PR 병합·배포·실제 예약 발행은 별도로 확인해야 합니다.
