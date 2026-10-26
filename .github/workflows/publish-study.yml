@@ -1,0 +1,63 @@
+name: Public Daily Study at 18 KST
+on:
+  schedule:
+    - cron: '0 9 * * 1-5'
+    - cron: '15 9 * * 1-5'
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: market-daily-public
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check public template and data permissions
+        run: python -m unittest discover -s tests -p 'test_*.py'
+      - name: Publish from latest main with bounded fast-forward retry
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python scripts/publish_public_study.py
+        env:
+          TZ: Asia/Seoul
+      - name: Reload published main for Pages
+        if: vars.MARKET_PAGES_DEPLOY == 'true'
+        run: |
+          git fetch origin main
+          git checkout --detach FETCH_HEAD
+      - name: Prepare public-only Pages artifact
+        if: vars.MARKET_PAGES_DEPLOY == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/market-pages/data"
+          cp index.html "$RUNNER_TEMP/market-pages/"
+          cp -R assets reports "$RUNNER_TEMP/market-pages/"
+          cp data/public-market.json "$RUNNER_TEMP/market-pages/data/"
+      - uses: actions/upload-pages-artifact@v3
+        if: vars.MARKET_PAGES_DEPLOY == 'true'
+        with:
+          path: ${{ runner.temp }}/market-pages
+  deploy:
+    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy approved public artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

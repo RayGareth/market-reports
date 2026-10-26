@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-10-22",
+  "publication": "original_study",
+  "edition": "archive-study",
+  "headline": "2026-10-22 · 지수 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "지수",
+    "explanation": "시장 지수는 정해진 여러 자산의 움직임을 하나의 수치로 요약합니다. 지수의 움직임과 모든 개별 종목의 움직임이 같지는 않습니다.",
+    "example": "학급 평균이 올라가도 모든 학생의 점수가 오른 것은 아닙니다. 시장 전체의 요약과 개별 기업의 상황도 나누어 읽어보세요.",
+    "question": "지수가 올랐다는 사실만으로 알 수 없는 것은?",
+    "options": [
+      "지수의 방향",
+      "지수가 시장을 요약한다는 점",
+      "모든 구성 종목이 올랐는지 여부"
+    ],
+    "answer": 2,
+    "why": "전체를 요약한 지수와 구성 종목 각각의 움직임은 다를 수 있습니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  }
+}

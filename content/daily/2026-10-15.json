@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-10-15",
+  "publication": "original_study",
+  "edition": "archive-study",
+  "headline": "2026-10-15 · 저축과 투자 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "저축과 투자",
+    "explanation": "저축은 돈을 모아 두는 활동이고, 투자는 자산의 가치 변화나 이자·배당 등의 성과를 기대하며 자산을 보유하는 활동입니다. 투자에는 손실 위험이 있습니다.",
+    "example": "곧 쓸 생활비와 오랫동안 쓰지 않을 돈은 사용 시점이 다릅니다. 금융 뉴스를 읽을 때도 자금의 목적과 기간을 함께 생각해 보세요.",
+    "question": "투자에 대한 설명으로 알맞은 것은?",
+    "options": [
+      "성과를 기대하지만 손실 위험도 있다",
+      "모든 투자의 이익은 확정되어 있다",
+      "투자는 언제나 저축과 같은 보장을 받는다"
+    ],
+    "answer": 0,
+    "why": "투자는 성과를 기대하는 활동이지만 결과를 보장하지는 않습니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-10-12",
+  "publication": "original_study",
+  "edition": "archive-study",
+  "headline": "2026-10-12 · 복리 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "복리",
+    "explanation": "복리는 원금에서 생긴 이자가 다음 이자를 계산하는 바탕에 함께 들어가는 방식입니다.",
+    "example": "예금을 고를 때는 이율뿐 아니라 이자를 언제 지급하고 다시 계산하는지도 살펴보세요. 실제 수익은 세금과 조건에 따라 달라집니다.",
+    "question": "복리를 설명한 문장은 무엇일까요?",
+    "options": [
+      "원금과 쌓인 이자를 함께 기준으로 이자를 계산한다",
+      "이자를 항상 원금에서만 계산한다",
+      "어떤 상품이든 원금이 보장된다"
+    ],
+    "answer": 0,
+    "why": "복리는 이전에 쌓인 이자도 다음 이자 계산에 포함하는 방식입니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  }
+}
