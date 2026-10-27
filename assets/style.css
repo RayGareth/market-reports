@@ -190,3 +190,20 @@ body{background:#f7f5ef}
 
 /* Quiet, readable learning-use notice shared by dashboard and dated reports. */
 .usage-notice{margin:0 auto 24px}.usage-notice p{margin:0;padding:18px 22px;border:1px solid var(--stroke);border-radius:12px;background:#eef1e9;color:#465e4e;font-size:14px;line-height:1.9;word-break:keep-all;overflow-wrap:anywhere}.usage-notice+.footer-inner{padding-top:2px}@media(max-width:550px){.usage-notice p{padding:16px;font-size:14px;line-height:1.85}}
+
+/* Prioritize closing figures; source and verification details sit below cards. */
+#market-metrics .metric{min-width:0;padding:22px 20px}
+#market-metrics .metric>small:first-child{display:block;font-size:13px;font-weight:700}
+#market-metrics .metric strong{font-size:32px;font-weight:800;letter-spacing:-.7px;line-height:1.2;white-space:nowrap;font-variant-numeric:tabular-nums;margin:14px 0 8px}
+#market-metrics .metric-change{display:block;font-size:22px;font-weight:700;line-height:1.35;font-variant-numeric:tabular-nums}
+#market-metrics .market-up{color:var(--up)}#market-metrics .market-down{color:var(--down)}#market-metrics .market-flat{color:var(--muted)}
+#market-metrics .metric-date{display:block;font-size:12px;font-weight:400;margin-top:10px;color:var(--muted);white-space:nowrap}
+#market-metrics .metric strong.metric-pending{font-size:18px;white-space:normal;letter-spacing:0}
+#market-metrics .metric-unavailable{font-size:12px;font-weight:400;color:var(--muted)}
+.market-validation-summary{margin:14px 0 7px;font-size:12px;color:var(--muted);line-height:1.7;overflow-wrap:anywhere}
+.market-source-notes{margin:10px 0 18px;border-top:1px solid var(--stroke);padding:12px 0 0;font-size:12px;color:var(--muted)}
+.market-source-notes summary{cursor:pointer;font-weight:600;color:#476b55;min-height:32px;line-height:2}
+.market-source-row{display:flex;flex-wrap:wrap;gap:4px 12px;padding:9px 0;border-bottom:1px solid #cbd4c766;line-height:1.7;overflow-wrap:anywhere}
+.market-source-row b{color:var(--fg)}.market-source-row span{flex-basis:100%}.market-source-row a{text-decoration:underline;text-underline-offset:3px}
+.market-source-copyright{font-size:11px!important;line-height:1.8;margin:10px 0!important;overflow-wrap:anywhere}
+@media(max-width:550px){#market-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#market-metrics .metric{padding:16px 12px}#market-metrics .metric strong{font-size:clamp(22px,6.7vw,32px);margin:12px 0 6px}#market-metrics .metric-change{font-size:19px}#market-metrics .metric-date{font-size:11px;margin-top:9px}}

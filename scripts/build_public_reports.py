@@ -98,25 +98,36 @@ def generate(doc, audience='public'):
             for row in rows:
                 overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
-            for row in rows:
-                verification = '확정 종가 · 교차 검증 완료' if row.get('verified') is True else '확정 종가 · 단일 출처 검증 · 교차 검증 대기'
-                overview += '<p class="sub">' + verification + ' · ' + esc(row['name']) + ' · <a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '종가 출처')) + ' ↗</a>'
-                if row.get('verificationSource'):
-                    overview += ' · <a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">교차 검증: ' + esc(row.get('verificationSourceName', '출처')) + ' ↗</a>'
-                if row.get('previousAsOf'):
-                    overview += ' · 등락률은 ' + esc(row['previousAsOf']) + ' 종가 대비'
-                for key in ('copyrightNotice', 'verificationCopyrightNotice'):
-                    if row.get(key):
-                        overview += ' · ' + esc(row[key])
-                overview += '</p>'
+
         else:
             overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'
+    pending = [row['name'] for row in doc.get('indices', []) if not row.get('verified')]
+    if pending:
+        overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · 단일 출처 검증 · 교차 검증 대기</p>'
+    if doc.get('indices'):
+        overview += '<details class="market-source-notes"><summary>출처·검증 정보</summary>'
+        notices = set()
+        for row in doc['indices']:
+            verification = '교차 검증 완료' if row.get('verified') is True else '단일 출처 · 비교 대기'
+            overview += '<div class="market-source-row"><b>' + esc(row['name']) + '</b><span>' + verification
+            if row.get('previousAsOf'):
+                overview += ' · ' + esc(row['previousAsOf']) + ' 종가 대비'
+            overview += '</span><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
+            if row.get('verificationSource'):
+                overview += '<a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('verificationSourceName', '비교 출처')) + ' ↗</a>'
+            overview += '</div>'
+            for key in ('copyrightNotice', 'verificationCopyrightNotice'):
+                if row.get(key):
+                    notices.add(row[key])
+        for notice in sorted(notices):
+            overview += '<p class="market-source-copyright">' + esc(notice) + '</p>'
+        overview += '</details>'
     for item in doc.get('distribution', []):
         overview += '<p>' + esc(item['name']) + ' · ' + esc(item['asOf']) + ' | 상승 ' + str(item['up']) + ' · 하락 ' + str(item['down']) + ' · 보합 ' + str(item['flat']) + '종목 · <a href="' + esc(item['source']) + '">출처</a></p>'
     if not doc.get('distribution'):
         overview += '<p class="report-status">코스피·코스닥 종목 분포: 공개 가능한 검증 자료가 있을 때 표시합니다.</p>'
     for state in doc.get('marketStatus', []):
-        if state['status'] != 'verified':
+        if state['status'] != 'verified' and not (state['status'] == 'single_source' and any(x['id'] == state['id'] for x in doc.get('indices', []))):
             overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(state['message']) + '</p>'
     issues = ''
     for item in doc.get('issues', []):

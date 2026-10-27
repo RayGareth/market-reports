@@ -11,14 +11,11 @@
     const card = document.createElement('div'); card.className = 'panel metric';
     const label = document.createElement('small'); label.textContent = name;
     const strong = document.createElement('strong'); strong.textContent = item ? item.close.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '자료 확인 대기';
-    const foot = document.createElement('span'); foot.className = 'sub';
-    foot.textContent = item ? `${item.changePct > 0 ? '+' : ''}${item.changePct.toFixed(2)}% · ${item.asOf} 확정 종가` : (labels[state?.status] || '공개 가능한 검증 자료 미연결');
-    card.append(label, strong, foot);
-    if (item) {
-      const status=document.createElement('span');status.className='sub';status.textContent=(item.verified===true?'확정 종가 · 교차 검증 완료':'확정 종가 · 단일 출처 검증 · 교차 검증 대기')+(item.previousAsOf ? ' · '+item.previousAsOf+' 종가 대비' : '');card.append(status);
-      const source = document.createElement('a'); source.className='sub';source.href=item.source;source.target='_blank';source.rel='noopener noreferrer';source.textContent='종가 출처 · '+(item.sourceName||'원문')+' ↗';card.append(source);
-      if (/^https:\/\//.test(item.verificationSource || '')) {const check = source.cloneNode();check.href=item.verificationSource;check.textContent='교차 검증 출처 · '+(item.verificationSourceName||'원문')+' ↗';card.append(check);}
-    }
+    const change = document.createElement('span'); change.className = 'metric-change'+(item ? item.changePct>0?' market-up':item.changePct<0?' market-down':' market-flat' : ' metric-unavailable');
+    change.textContent = item ? `${item.changePct > 0 ? '+' : ''}${item.changePct.toFixed(2)}%` : (labels[state?.status] || '검증 자료 미연결');
+    const day = document.createElement('small'); day.className='metric-date';day.textContent=item ? item.asOf+' 기준' : state?.expectedAsOf||'';
+    if(!item)strong.className='metric-pending';
+    card.append(label, strong, change, day);
     target.append(card);
   };
   let indices=[], states=[], checkedAt='';
@@ -31,6 +28,28 @@
   } catch { /* Never fabricate prices or silently relabel older data as today's close. */ }
   target.replaceChildren();
   for(const name of ['KOSPI','KOSDAQ','S&P 500','NASDAQ'])add(name,indices.find(x=>x.name===name),states.find(x=>x.name===name));
+  let notes=document.getElementById('market-source-notes');
+  const wasOpen=notes?.open||false;
+  if(!notes){notes=document.createElement('details');notes.id='market-source-notes';notes.className='market-source-notes';target.after(notes);}
+  notes.replaceChildren();notes.open=wasOpen;
+  const heading=document.createElement('summary');heading.textContent='출처·검증 정보';notes.append(heading);
+  const pending=indices.filter(x=>!x.verified).map(x=>x.name);
+  let stateLine=document.getElementById('market-validation-summary');
+  if(!stateLine){stateLine=document.createElement('p');stateLine.id='market-validation-summary';stateLine.className='market-validation-summary';notes.before(stateLine);}
+  stateLine.textContent=pending.length?pending.join(' · ')+' · 단일 출처 검증 · 교차 검증 대기':indices.length?'표시된 지수 · 교차 검증 완료':'확인된 자료가 있을 때 표시합니다';
+  const notices=new Set();
+  for(const item of indices){
+    const row=document.createElement('div');row.className='market-source-row';
+    const title=document.createElement('b');title.textContent=item.name;
+    const status=document.createElement('span');status.textContent=(item.verified?'교차 검증 완료':'단일 출처 · 비교 대기')+(item.previousAsOf?' · '+item.previousAsOf+' 종가 대비':'');row.append(title,status);
+    for(const [url,label] of [[item.source,item.sourceName||'원문'],[item.verificationSource,item.verificationSourceName||'비교 출처']]){
+      if(!/^https:\/\//.test(url||''))continue;
+      const link=document.createElement('a');link.href=url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=label+' ↗';row.append(link);
+    }
+    for(const key of ['copyrightNotice','verificationCopyrightNotice'])if(item[key])notices.add(item[key]);
+    notes.append(row);
+  }
+  for(const text of notices){const n=document.createElement('p');n.className='market-source-copyright';n.textContent=text;notes.append(n);}
   const regionDate=region=>[...new Set(indices.filter(x=>x.region===region).map(x=>x.asOf))].join(' · ')||'확인 대기';
   const summary=document.getElementById('market-date-summary');
   summary.textContent=`국내: ${regionDate('kr')} / 미국: ${regionDate('us')} · 지표별 확정 종가 기준 · 실시간 시세가 아닙니다.`;
