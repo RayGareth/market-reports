@@ -1,4 +1,5 @@
-(async () => {
+(() => {
+  async function refreshLatest() {
   try {
     const response = await fetch('reports/index.json', {cache: 'no-cache'});
     if (!response.ok) throw Error('Archive unavailable');
@@ -10,4 +11,8 @@
     }
     for (const link of document.querySelectorAll('#latest-link,.quick-access-action')) link.href = 'reports/' + latest.url;
   } catch { /* reports/latest.html remains a working, prebuilt fallback. */ }
+  }
+  refreshLatest();
+  setInterval(refreshLatest, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLatest(); });
 })();

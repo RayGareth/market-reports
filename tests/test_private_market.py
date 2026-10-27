@@ -44,6 +44,21 @@ def calendar(*args):
 
 
 class PrivateTests(unittest.TestCase):
+    def test_private_single_source_option_is_explicit_and_never_cross_verified(self):
+        adapters={'a':Fake(),'b':Fake(missing=True)}
+        self.assertEqual(collect_private(config(),NOW,adapters,calendar)['indices'],[])
+        result=collect_private(config(),NOW,adapters,calendar,allow_single_source=True)
+        self.assertEqual(len(result['indices']),4)
+        self.assertTrue(all(r['validated'] and not r['verified'] for r in result['indices']))
+        self.assertTrue(all(s['status']=='single_source' for s in result['marketStatus']))
+        doc=builder.make_doc(NOW.date());doc['indices']=result['indices']
+        rendered=builder.generate(doc,audience='private')
+        self.assertIn('단일 출처 검증 · 교차 검증 대기',rendered)
+        self.assertNotIn('교차 검증 완료',rendered)
+        with self.assertRaises(ValueError):builder.generate(doc)
+        mismatch=collect_private(config(),NOW,{'a':Fake(),'b':Fake(104)},calendar,allow_single_source=True)
+        self.assertEqual(mismatch['indices'],[])
+
     def test_transient_retry_is_bounded_and_rate_limits_are_not_retried(self):
         import requests
         from market_sources import get_text

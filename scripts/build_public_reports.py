@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 TITLES = ['오늘의 시장 한눈에 보기', '오늘의 주요 이슈와 시장 흐름', '오늘의 경제 공부', '오늘의 복습 퀴즈']
 SOURCE = 'https://www.investor.gov/introduction-investing'
+USAGE_NOTICE = '본 자료는 개인 학습 및 경제·금융시장 이해를 목적으로 작성되었습니다. 상업적 이용을 엄격히 금지하며, 투자 권유 또는 투자 판단을 위한 자료로 제공되지 않습니다.'
 # Original short explanations; numeric examples are explicitly hypothetical.
 LESSONS = [
     {'term': '복리', 'explanation': '복리는 원금에서 생긴 이자가 다음 이자를 계산하는 바탕에 함께 들어가는 방식입니다.',
@@ -39,7 +40,7 @@ def https(value):
 
 def approved(item, audience='public'):
     rights = item.get('publication', {})
-    return item.get('verified') is True and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
+    return (item.get('verified') is True or (audience == 'private' and item.get('validated') is True and item.get('verificationStatus') == 'pending')) and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
 
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
@@ -98,7 +99,8 @@ def generate(doc, audience='public'):
                 overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
             for row in rows:
-                overview += '<p class="sub">확정 종가 · 교차 검증 완료 · ' + esc(row['name']) + ' · <a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '종가 출처')) + ' ↗</a>'
+                verification = '확정 종가 · 교차 검증 완료' if row.get('verified') is True else '확정 종가 · 단일 출처 검증 · 교차 검증 대기'
+                overview += '<p class="sub">' + verification + ' · ' + esc(row['name']) + ' · <a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '종가 출처')) + ' ↗</a>'
                 if row.get('verificationSource'):
                     overview += ' · <a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">교차 검증: ' + esc(row.get('verificationSourceName', '출처')) + ' ↗</a>'
                 if row.get('previousAsOf'):
@@ -133,7 +135,13 @@ def generate(doc, audience='public'):
         note = '이 날짜의 경제 공부를 위해 새로 작성한 공개 학습판입니다. 과거 시황을 재구성한 자료가 아니며, 기존 상세 원본은 별도로 보존됩니다.'
     if doc.get('revision'):
         note += ' 수정판 ' + str(doc['revision']) + ' · 최초 발행본과 이전 수정판은 보존합니다.'
-    return '''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5ef"><title>%s | Market Daily</title><link rel="stylesheet" href="../../assets/style.css"></head><body><header class="site-header"><div class="container nav"><a class="brand" href="../../"><span class="brand-mark">◈</span>MARKET DAILY</a><nav class="navlinks" aria-label="메인 탐색"><a href="../../">대시보드</a><a href="../">리포트 아카이브</a></nav></div></header><main class="container"><section class="hero report-article"><div class="eyebrow">DAILY STUDY / %s</div><h1>%s</h1><p class="lead">%s</p><div class="notice">%s</div></section><article class="report-article">%s<p><a class="button" href="../">← 아카이브로 돌아가기</a></p></article></main><footer><div class="container footer-inner"><div>MARKET DAILY · RAY'S MARKET NOTE</div><div>개인 경제 공부와 시장 기록</div></div></footer><script src="../../assets/quiz.js" defer></script></body></html>''' % (esc(day), esc(day), esc(doc['headline']), esc(doc['summary']), esc(note), sections)
+    return insert_usage_notice('''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5ef"><title>%s | Market Daily</title><link rel="stylesheet" href="../../assets/style.css"></head><body><header class="site-header"><div class="container nav"><a class="brand" href="../../"><span class="brand-mark">◈</span>MARKET DAILY</a><nav class="navlinks" aria-label="메인 탐색"><a href="../../">대시보드</a><a href="../">리포트 아카이브</a></nav></div></header><main class="container"><section class="hero report-article"><div class="eyebrow">DAILY STUDY / %s</div><h1>%s</h1><p class="lead">%s</p><div class="notice">%s</div></section><article class="report-article">%s<p><a class="button" href="../">← 아카이브로 돌아가기</a></p></article></main><footer><div class="container footer-inner"><div>MARKET DAILY · RAY'S MARKET NOTE</div><div>개인 경제 공부와 시장 기록</div></div></footer><script src="../../assets/quiz.js" defer></script></body></html>''' % (esc(day), esc(day), esc(doc['headline']), esc(doc['summary']), esc(note), sections))
+
+def insert_usage_notice(page):
+    if 'id="usage-notice"' in page:
+        return page
+    notice = '<aside class="container usage-notice" id="usage-notice" aria-label="자료 이용 안내"><p>' + esc(USAGE_NOTICE) + '</p></aside>'
+    return page.replace('<footer>', '<footer>' + notice, 1)
 
 def build(root, day, backfill=False, market=None):
     folder = root / 'content/daily'
@@ -177,6 +185,11 @@ def build(root, day, backfill=False, market=None):
         destination.write_text(json.dumps(target_doc, ensure_ascii=False, indent=2) + '\n')
     if not target.exists():
         target.write_text(generate(target_doc))
+    for existing in (root / 'reports/daily').glob('*.html'):
+        original = existing.read_text()
+        updated = insert_usage_notice(original)
+        if updated != original:
+            existing.write_text(updated)
     old_index = root / 'reports/index.json'
     previous = json.loads(old_index.read_text()) if old_index.exists() else []
     by_date = {r['date']:r for r in previous if re.fullmatch(r'20\d{2}-\d{2}-\d{2}', r.get('date', '')) and re.fullmatch(r'daily/20\d{2}-\d{2}-\d{2}(?:-r\d{3})?\.html', r.get('url', '')) and (root / 'reports' / r['url']).is_file()}

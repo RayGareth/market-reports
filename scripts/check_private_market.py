@@ -39,7 +39,7 @@ def preview(root, market, now):
     page.write_text(page.read_text().replace('<body>', '<body><div class="notice">' + BANNER + '</div>'))
     # Only this disposable loopback copy accepts private observations.
     script = root / 'assets/market.js'
-    script.write_text(script.read_text().replace("status==='approved_public'", "status==='private_only'"))
+    script.write_text(script.read_text().replace("x.verified===true&&x.publication", "(x.verified===true||x.validated===true)&&x.publication").replace("status==='approved_public'", "status==='private_only'"))
     latest = root / 'assets/latest.js'
     latest.write_text(latest.read_text().replace('공개 학습판', '비공개 검증판'))
     day = now.astimezone(ZoneInfo('Asia/Seoul')).date()
@@ -65,6 +65,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True, type=Path)
     parser.add_argument('--rounds', type=int, default=2, choices=(1, 2))
+    parser.add_argument('--allow-single-source', action='store_true', help='Private only: display validated closes while comparison source is delayed; never claim cross-verification')
     args = parser.parse_args()
     config_path = args.config.resolve()
     if any((p / '.git').exists() for p in (config_path.parent, *config_path.parents)):
@@ -82,7 +83,7 @@ def main():
             # Third-party libraries can print URLs, exceptions or values.
             # Discard their diagnostics; return only our finite status codes.
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-                market = collect_private(cfg, now=now)
+                market = collect_private(cfg, now=now, allow_single_source=args.allow_single_source)
             root = Path(tmp) / str(n)
             root.mkdir(mode=0o700)
             preview(root, market, now)
@@ -93,7 +94,7 @@ def main():
         check = subprocess.run(['node', str(ROOT / 'tests/private-market-ui.cjs'), *roots], capture_output=True, text=True)
         ui = json.loads(check.stdout) if check.returncode == 0 else {'status':'failed_redacted'}
     print(json.dumps({'rounds':summaries, 'ui':ui, 'publicDataWritten':False, 'temporaryDataRemoved':True}, ensure_ascii=False, indent=2))
-    return 0 if ui.get('status') == 'passed' and all(s['status'] == 'verified' for r in summaries for s in r['indices']) else 1
+    return 0 if ui.get('status') == 'passed' and all(s['status'] in (('verified', 'single_source') if args.allow_single_source else ('verified',)) for r in summaries for s in r['indices']) else 1
 
 
 if __name__ == '__main__':

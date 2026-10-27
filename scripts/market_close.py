@@ -25,6 +25,7 @@ MESSAGES = {
     'disagreement':'출처 간 수치가 달라 표시를 보류합니다',
     'invalid':'수치 또는 기준일 검증을 통과하지 못했습니다',
     'verified':'확정 종가 · 교차 검증 완료',
+    'single_source':'확정 종가 · 단일 출처 검증 · 교차 검증 대기',
 }
 
 def session_pair(calendar_name, now, reviewed_through):
@@ -86,10 +87,10 @@ def private_allowed(policy, instrument, today):
 def collect(config, now=None, adapters=None, calendar=session_pair):
     return _collect(config, now, adapters, calendar, audience='public')
 
-def collect_private(config, now=None, adapters=None, calendar=session_pair):
-    return _collect(config, now, adapters, calendar, audience='private')
+def collect_private(config, now=None, adapters=None, calendar=session_pair, *, allow_single_source=False):
+    return _collect(config, now, adapters, calendar, audience='private', allow_single_source=allow_single_source)
 
-def _collect(config, now, adapters, calendar, *, audience):
+def _collect(config, now, adapters, calendar, *, audience, allow_single_source=False):
     now = now or datetime.now(timezone.utc)
     adapters = adapters if adapters is not None else ADAPTERS
     indices, statuses = [], []
@@ -142,7 +143,23 @@ def _collect(config, now, adapters, calendar, *, audience):
                 row['copyrightNotice'] = policy['private'].get('copyrightNotice', '')
                 row['verificationCopyrightNotice'] = checkers[0][1]['private'].get('copyrightNotice', '')
             indices.append(row); state['status']='verified'; break
-        if state.get('status') != 'verified':
+        if (audience == 'private' and allow_single_source and state.get('status') != 'verified'
+                and failure in ('missing', 'provider_error', 'verification_unavailable') and 'invalid' not in errors):
+            # A delayed comparison source need not hide a validated close in a
+            # private preview. Never label it cross-verified or allow it public.
+            for primary, policy in candidates:
+                if primary not in good:
+                    continue
+                a, prev_a, pct_a = good[primary]
+                row = {'id':instrument, 'name':meta['name'], 'region':meta['region'],
+                       'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(),
+                       'close':round(a,2), 'changePct':round(pct_a,2), 'verified':False,
+                       'validated':True, 'verificationStatus':'pending', 'verificationReason':failure,
+                       'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label',primary),
+                       'publication':{'status':'private_only','evidence':policy['private']['evidence']},
+                       'copyrightNotice':policy['private'].get('copyrightNotice','')}
+                indices.append(row);state['status']='single_source';break
+        if state.get('status') not in ('verified', 'single_source'):
             state['status'] = failure
         state['message'] = MESSAGES[state['status']]
         statuses.append(state)
