@@ -37,11 +37,13 @@ def esc(value):
 def https(value):
     return isinstance(value, str) and value.startswith('https://') and len(value) > 8
 
-def approved(item):
+def approved(item, audience='public'):
     rights = item.get('publication', {})
-    return item.get('verified') is True and rights.get('status') == 'approved_public' and https(rights.get('evidence')) and https(item.get('source'))
+    return item.get('verified') is True and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
 
-def validate(doc):
+def validate(doc, audience='public'):
+    if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
+        raise ValueError('Private preview cannot enter the public builder')
     date.fromisoformat(doc['date'])
     if doc.get('schemaVersion') != 4 or doc.get('publication') != 'original_study':
         raise ValueError('Only reviewed four-section original study notes are supported')
@@ -51,7 +53,7 @@ def validate(doc):
     if not 0 <= lesson['answer'] < len(lesson['options']):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
-        if not approved(item):
+        if not approved(item, audience):
             raise ValueError('Unconfirmed market-data publication permission: refusing to render')
         date.fromisoformat(item['asOf'])
         if item.get('verificationSource') and not https(item['verificationSource']):
@@ -83,8 +85,8 @@ def make_doc(day, backfill=False):
             'summary': '시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.',
             'indices': [], 'distribution': [], 'issues': [], 'lesson': lesson}
 
-def generate(doc):
-    validate(doc)
+def generate(doc, audience='public'):
+    validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
     overview = ''
     for region, label in [('kr', '국내'), ('us', '미국')]:
@@ -101,6 +103,9 @@ def generate(doc):
                     overview += ' · <a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">교차 검증: ' + esc(row.get('verificationSourceName', '출처')) + ' ↗</a>'
                 if row.get('previousAsOf'):
                     overview += ' · 등락률은 ' + esc(row['previousAsOf']) + ' 종가 대비'
+                for key in ('copyrightNotice', 'verificationCopyrightNotice'):
+                    if row.get(key):
+                        overview += ' · ' + esc(row[key])
                 overview += '</p>'
         else:
             overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'

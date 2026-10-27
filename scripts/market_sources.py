@@ -27,10 +27,20 @@ def number(value):
 
 def get_text(url, params=None, headers=None):
     import requests
-    response = requests.get(url, params=params, headers={'User-Agent':'MarketDaily/1.0 (end-of-day verification)', **(headers or {})}, timeout=(8, 20), allow_redirects=False)
-    if response.status_code != 200:
+    # One bounded retry for transient transport/5xx failures. Never retry an
+    # authentication failure or rate limit, or log a URL/body/exception.
+    for attempt in range(2):
+        try:
+            response = requests.get(url, params=params, headers={'User-Agent':'MarketDaily/1.0 (end-of-day verification)', **(headers or {})}, timeout=(8, 20), allow_redirects=False)
+        except (requests.Timeout, requests.ConnectionError):
+            if attempt == 0:
+                continue
+            raise RuntimeError('Provider unavailable') from None
+        if response.status_code == 200:
+            return response.text
+        if attempt == 0 and response.status_code in (500, 502, 503, 504):
+            continue
         raise RuntimeError('Provider unavailable')
-    return response.text
 
 def parse_fred(text, instrument):
     rows = list(csv.DictReader(io.StringIO(text)))

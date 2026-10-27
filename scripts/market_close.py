@@ -71,7 +71,25 @@ def checked_pair(bars, target, previous):
         raise ValueError('Reported rate differs from close-to-close calculation')
     return current.close, prior.close, pct
 
+def private_allowed(policy, instrument, today):
+    """Private preview is a separate, explicit grant, never public approval."""
+    grant = policy.get('private', {})
+    try:
+        return (policy.get('enabled') is True and policy.get('collectionAllowed') is True
+                and instrument in policy.get('instruments', [])
+                and all(grant.get(k) is True for k in ('display', 'derivedReturns', 'temporaryStorage'))
+                and grant.get('evidence', '').startswith('https://')
+                and date.fromisoformat(grant['reviewedAt']) <= today <= date.fromisoformat(grant['validThrough']))
+    except (KeyError, ValueError, TypeError):
+        return False
+
 def collect(config, now=None, adapters=None, calendar=session_pair):
+    return _collect(config, now, adapters, calendar, audience='public')
+
+def collect_private(config, now=None, adapters=None, calendar=session_pair):
+    return _collect(config, now, adapters, calendar, audience='private')
+
+def _collect(config, now, adapters, calendar, *, audience):
     now = now or datetime.now(timezone.utc)
     adapters = adapters if adapters is not None else ADAPTERS
     indices, statuses = [], []
@@ -82,12 +100,13 @@ def collect(config, now=None, adapters=None, calendar=session_pair):
             state['expectedAsOf'] = target.isoformat()
         except Exception:
             state.update(status='calendar_unavailable', message=MESSAGES['calendar_unavailable']); statuses.append(state); continue
-        candidates = [(name, p) for name, p in config['providers'].items() if public_allowed(p, instrument, now.date()) and name in adapters]
+        allowed = public_allowed if audience == 'public' else private_allowed
+        candidates = [(name, p) for name, p in config['providers'].items() if allowed(p, instrument, now.date()) and name in adapters]
         if not candidates:
             state.update(status='rights_pending', message=MESSAGES['rights_pending']); statuses.append(state); continue
         good, errors = {}, []
         for name, policy in config['providers'].items():
-            if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []):
+            if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []) or (audience == 'private' and not private_allowed(policy, instrument, now.date())):
                 continue
             try:
                 good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
@@ -118,7 +137,10 @@ def collect(config, now=None, adapters=None, calendar=session_pair):
             except ValueError:
                 failure = 'disagreement'
                 break  # Do not shop for an agreeing pair after a valid source disagrees.
-            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'verified':True, 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary), 'verificationSource':checkers[0][1]['sourceUrls'][instrument], 'verificationSourceName':checkers[0][1].get('label', checkers[0][0]), 'publication':{'status':'approved_public','evidence':policy['public']['evidence']}}
+            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'verified':True, 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary), 'verificationSource':checkers[0][1]['sourceUrls'][instrument], 'verificationSourceName':checkers[0][1].get('label', checkers[0][0]), 'publication':{'status':'approved_public' if audience == 'public' else 'private_only','evidence':policy['public' if audience == 'public' else 'private']['evidence']}}
+            if audience == 'private':
+                row['copyrightNotice'] = policy['private'].get('copyrightNotice', '')
+                row['verificationCopyrightNotice'] = checkers[0][1]['private'].get('copyrightNotice', '')
             indices.append(row); state['status']='verified'; break
         if state.get('status') != 'verified':
             state['status'] = failure
