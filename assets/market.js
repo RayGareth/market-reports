@@ -1,5 +1,17 @@
 (() => {
   let refreshing = false;
+  function fitMarketNumbers() {
+    for (const card of document.querySelectorAll('#market-metrics .metric')) {
+      const price=card.querySelector('strong:not(.metric-pending)'), change=card.querySelector('.metric-change');
+      if(!price||!change)continue;
+      price.style.fontSize='';change.style.fontSize='';
+      if(price.scrollWidth>price.clientWidth&&price.clientWidth>0){
+        const size=Math.floor(parseFloat(getComputedStyle(price).fontSize)*price.clientWidth/price.scrollWidth*10)/10;
+        price.style.fontSize=size+'px';
+        if(parseFloat(getComputedStyle(change).fontSize)>=size)change.style.fontSize=Math.max(12,size-3)+'px';
+      }
+    }
+  }
   async function refresh() {
   if (refreshing) return;
   refreshing = true;
@@ -54,9 +66,12 @@
   const summary=document.getElementById('market-date-summary');
   summary.textContent=`국내: ${regionDate('kr')} / 미국: ${regionDate('us')} · 지표별 확정 종가 기준 · 실시간 시세가 아닙니다.`;
   if(checkedAt){const n=document.createElement('div');n.className='sub';const date=new Date(checkedAt);if(!Number.isNaN(date.valueOf()))n.textContent='최근 수집 확인: '+date.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST';summary.append(n);}
+  fitMarketNumbers();
+  document.fonts?.ready.then(fitMarketNumbers);
   } finally { refreshing = false; }
   }
   refresh();
   setInterval(refresh, 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+  window.addEventListener('resize', () => requestAnimationFrame(fitMarketNumbers));
 })();
