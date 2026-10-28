@@ -41,4 +41,4 @@ def publish(repo, attempts=3, before_push=None, build_args=()):
 if __name__ == '__main__':
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Run through the publication workflow; no local checkout is modified')
-    print('Published public revision:', publish(Path(__file__).resolve().parents[1]))
+    print('Published public revision:', publish(Path(__file__).resolve().parents[1], build_args=('--market',)))

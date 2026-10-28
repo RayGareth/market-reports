@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install calendar and source adapters
+        run: pip install -r requirements-public.txt
       - name: Check public template and data permissions
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Publish from latest main with bounded fast-forward retry
@@ -31,6 +33,8 @@ jobs:
           python scripts/publish_public_study.py
         env:
           TZ: Asia/Seoul
+          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
+          FSC_API_KEY: ${{ secrets.FSC_API_KEY }}
       - name: Reload published main for Pages
         if: vars.MARKET_PAGES_DEPLOY == 'true'
         run: |

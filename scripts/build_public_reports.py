@@ -3,6 +3,8 @@
 Existing dated HTML and manuscripts are preserved. No market data is scraped.
 """
 import argparse
+import copy
+import re
 import html
 import json
 import math
@@ -13,6 +15,7 @@ from zoneinfo import ZoneInfo
 ROOT = Path(__file__).resolve().parents[1]
 TITLES = ['오늘의 시장 한눈에 보기', '오늘의 주요 이슈와 시장 흐름', '오늘의 경제 공부', '오늘의 복습 퀴즈']
 SOURCE = 'https://www.investor.gov/introduction-investing'
+USAGE_NOTICE = '본 자료는 개인 학습 및 경제·금융시장 이해를 목적으로 작성되었습니다. 상업적 이용을 엄격히 금지하며, 투자 권유 또는 투자 판단을 위한 자료로 제공되지 않습니다.'
 # Original short explanations; numeric examples are explicitly hypothetical.
 LESSONS = [
     {'term': '복리', 'explanation': '복리는 원금에서 생긴 이자가 다음 이자를 계산하는 바탕에 함께 들어가는 방식입니다.',
@@ -35,11 +38,13 @@ def esc(value):
 def https(value):
     return isinstance(value, str) and value.startswith('https://') and len(value) > 8
 
-def approved(item):
+def approved(item, audience='public'):
     rights = item.get('publication', {})
-    return item.get('verified') is True and rights.get('status') == 'approved_public' and https(rights.get('evidence')) and https(item.get('source'))
+    return (item.get('verified') is True or (audience == 'private' and item.get('validated') is True and item.get('verificationStatus') == 'pending')) and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
 
-def validate(doc):
+def validate(doc, audience='public'):
+    if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
+        raise ValueError('Private preview cannot enter the public builder')
     date.fromisoformat(doc['date'])
     if doc.get('schemaVersion') != 4 or doc.get('publication') != 'original_study':
         raise ValueError('Only reviewed four-section original study notes are supported')
@@ -49,9 +54,13 @@ def validate(doc):
     if not 0 <= lesson['answer'] < len(lesson['options']):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
-        if not approved(item):
+        if not approved(item, audience):
             raise ValueError('Unconfirmed market-data publication permission: refusing to render')
         date.fromisoformat(item['asOf'])
+        if item.get('verificationSource') and not https(item['verificationSource']):
+            raise ValueError('Invalid verification source')
+        if item.get('previousAsOf') and date.fromisoformat(item['previousAsOf']) >= date.fromisoformat(item['asOf']):
+            raise ValueError('Invalid previous session')
         if item.get('region') not in ('kr', 'us') or not item.get('name'):
             raise ValueError('Index region and name required')
         if not all(isinstance(item.get(k), (float, int)) and not isinstance(item[k], bool) and math.isfinite(item[k]) for k in ('close', 'changePct')) or item['close'] <= 0:
@@ -77,8 +86,8 @@ def make_doc(day, backfill=False):
             'summary': '시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.',
             'indices': [], 'distribution': [], 'issues': [], 'lesson': lesson}
 
-def generate(doc):
-    validate(doc)
+def generate(doc, audience='public'):
+    validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
     overview = ''
     for region, label in [('kr', '국내'), ('us', '미국')]:
@@ -89,12 +98,37 @@ def generate(doc):
             for row in rows:
                 overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
+
         else:
             overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'
+    pending = [row['name'] for row in doc.get('indices', []) if not row.get('verified')]
+    if pending:
+        overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · 단일 출처 검증 · 교차 검증 대기</p>'
+    if doc.get('indices'):
+        overview += '<details class="market-source-notes"><summary>출처·검증 정보</summary>'
+        notices = set()
+        for row in doc['indices']:
+            verification = '교차 검증 완료' if row.get('verified') is True else '단일 출처 · 비교 대기'
+            overview += '<div class="market-source-row"><b>' + esc(row['name']) + '</b><span>' + verification
+            if row.get('previousAsOf'):
+                overview += ' · ' + esc(row['previousAsOf']) + ' 종가 대비'
+            overview += '</span><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
+            if row.get('verificationSource'):
+                overview += '<a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('verificationSourceName', '비교 출처')) + ' ↗</a>'
+            overview += '</div>'
+            for key in ('copyrightNotice', 'verificationCopyrightNotice'):
+                if row.get(key):
+                    notices.add(row[key])
+        for notice in sorted(notices):
+            overview += '<p class="market-source-copyright">' + esc(notice) + '</p>'
+        overview += '</details>'
     for item in doc.get('distribution', []):
         overview += '<p>' + esc(item['name']) + ' · ' + esc(item['asOf']) + ' | 상승 ' + str(item['up']) + ' · 하락 ' + str(item['down']) + ' · 보합 ' + str(item['flat']) + '종목 · <a href="' + esc(item['source']) + '">출처</a></p>'
     if not doc.get('distribution'):
         overview += '<p class="report-status">코스피·코스닥 종목 분포: 공개 가능한 검증 자료가 있을 때 표시합니다.</p>'
+    for state in doc.get('marketStatus', []):
+        if state['status'] != 'verified' and not (state['status'] == 'single_source' and any(x['id'] == state['id'] for x in doc.get('indices', []))):
+            overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(state['message']) + '</p>'
     issues = ''
     for item in doc.get('issues', []):
         issues += '<div class="reading-item"><b class="fact-label">확인된 사실</b><p>' + esc(item['fact']) + '</p>'
@@ -110,58 +144,111 @@ def generate(doc):
     note = '공개 학습판 · 확인되지 않은 시세를 포함하지 않습니다. 실시간 시세가 아닙니다.'
     if doc.get('edition') == 'archive-study':
         note = '이 날짜의 경제 공부를 위해 새로 작성한 공개 학습판입니다. 과거 시황을 재구성한 자료가 아니며, 기존 상세 원본은 별도로 보존됩니다.'
-    return '''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5ef"><title>%s | Market Daily</title><link rel="stylesheet" href="../../assets/style.css"></head><body><header class="site-header"><div class="container nav"><a class="brand" href="../../"><span class="brand-mark">◈</span>MARKET DAILY</a><nav class="navlinks" aria-label="메인 탐색"><a href="../../">대시보드</a><a href="../">리포트 아카이브</a></nav></div></header><main class="container"><section class="hero report-article"><div class="eyebrow">DAILY STUDY / %s</div><h1>%s</h1><p class="lead">%s</p><div class="notice">%s</div></section><article class="report-article">%s<p><a class="button" href="../">← 아카이브로 돌아가기</a></p></article></main><footer><div class="container footer-inner"><div>MARKET DAILY · RAY'S MARKET NOTE</div><div>개인 경제 공부와 시장 기록</div></div></footer><script src="../../assets/quiz.js" defer></script></body></html>''' % (esc(day), esc(day), esc(doc['headline']), esc(doc['summary']), esc(note), sections)
+    if doc.get('revision'):
+        note += ' 수정판 ' + str(doc['revision']) + ' · 최초 발행본과 이전 수정판은 보존합니다.'
+    return insert_usage_notice('''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5ef"><title>%s | Market Daily</title><link rel="stylesheet" href="../../assets/style.css"></head><body><header class="site-header"><div class="container nav"><a class="brand" href="../../"><span class="brand-mark">◈</span>MARKET DAILY</a><nav class="navlinks" aria-label="메인 탐색"><a href="../../">대시보드</a><a href="../">리포트 아카이브</a></nav></div></header><main class="container"><section class="hero report-article"><div class="eyebrow">DAILY STUDY / %s</div><h1>%s</h1><p class="lead">%s</p><div class="notice">%s</div></section><article class="report-article">%s<p><a class="button" href="../">← 아카이브로 돌아가기</a></p></article></main><footer><div class="container footer-inner"><div>MARKET DAILY · RAY'S MARKET NOTE</div><div>개인 경제 공부와 시장 기록</div></div></footer><script src="../../assets/quiz.js" defer></script></body></html>''' % (esc(day), esc(day), esc(doc['headline']), esc(doc['summary']), esc(note), sections))
 
-def build(root, day, backfill=False):
-    manuscript = root / 'content/daily' / (day.isoformat() + '.json')
-    target = root / 'reports/daily' / (day.isoformat() + '.html')
+def insert_usage_notice(page):
+    if 'id="usage-notice"' in page:
+        return page
+    notice = '<aside class="container usage-notice" id="usage-notice" aria-label="자료 이용 안내"><p>' + esc(USAGE_NOTICE) + '</p></aside>'
+    return page.replace('<footer>', '<footer>' + notice, 1)
+
+def build(root, day, backfill=False, market=None):
+    folder = root / 'content/daily'
+    manuscript = folder / (day.isoformat() + '.json')
+    original_target = root / 'reports/daily' / (day.isoformat() + '.html')
     doc = json.loads(manuscript.read_text()) if manuscript.exists() else make_doc(day, backfill)
-    validate(doc)  # Fail before writing any unapproved input.
+    validate(doc)
     if doc['date'] != day.isoformat():
         raise ValueError('Manuscript date mismatch')
-    rendered = generate(doc)
-    for p in (manuscript, target):
-        p.parent.mkdir(parents=True, exist_ok=True)
+    variants = sorted(folder.glob(day.isoformat() + '-r*.json')) if folder.exists() else []
+    current = json.loads(variants[-1].read_text()) if variants else doc
+    target_doc, destination = current, manuscript
+    new_revision = False
+    if market is not None:
+        enriched = copy.deepcopy(current)
+        enriched['indices'] = market['indices']
+        enriched['marketStatus'] = market['marketStatus']
+        validate(enriched)  # Never write an unapproved observation, even to a manuscript.
+        if original_target.exists() or manuscript.exists():
+            if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
+                enriched['revision'] = int(current.get('revision', 0)) + 1
+                if enriched['revision'] > 999:
+                    raise ValueError('Revision limit reached')
+                destination = folder / (day.isoformat() + '-r%03d.json' % enriched['revision'])
+                target_doc, new_revision = enriched, True
+        else:
+            target_doc = enriched
+    target = root / 'reports/daily' / (destination.stem + '.html')
+    if variants and not new_revision:
+        destination, target = variants[-1], root / 'reports/daily' / (variants[-1].stem + '.html')
+    # Validate all existing manuscripts before changing output.
+    for path in folder.glob('*.json') if folder.exists() else []:
+        prior = json.loads(path.read_text())
+        if prior.get('schemaVersion') == 4:
+            validate(prior)
+    for file in (manuscript, target):
+        file.parent.mkdir(parents=True, exist_ok=True)
     if not manuscript.exists():
-        manuscript.write_text(json.dumps(doc, ensure_ascii=False, indent=2) + '\n')
+        manuscript.write_text(json.dumps(target_doc, ensure_ascii=False, indent=2) + '\n')
+    if new_revision and not destination.exists():
+        destination.write_text(json.dumps(target_doc, ensure_ascii=False, indent=2) + '\n')
     if not target.exists():
-        target.write_text(rendered)
-    # Rebuild only from this public-safe schema; never copy the private index.
+        target.write_text(generate(target_doc))
+    for existing in (root / 'reports/daily').glob('*.html'):
+        original = existing.read_text()
+        updated = insert_usage_notice(original)
+        if updated != original:
+            existing.write_text(updated)
     old_index = root / 'reports/index.json'
     previous = json.loads(old_index.read_text()) if old_index.exists() else []
-    by_date = {r['date']: r for r in previous if r.get('url') == 'daily/' + r.get('date', '') + '.html' and (root / 'reports' / r['url']).is_file()}
-    entries = []
-    for path in sorted((root / 'content/daily').glob('*.json'), reverse=True):
+    by_date = {r['date']:r for r in previous if re.fullmatch(r'20\d{2}-\d{2}-\d{2}', r.get('date', '')) and re.fullmatch(r'daily/20\d{2}-\d{2}-\d{2}(?:-r\d{3})?\.html', r.get('url', '')) and (root / 'reports' / r['url']).is_file()}
+    public_docs = []
+    for path in folder.glob('*.json'):
         item = json.loads(path.read_text())
         if item.get('schemaVersion') != 4:
             continue
-        validate(item)
-        if (root / 'reports/daily' / (item['date'] + '.html')).exists():
-            entries.append({'date': item['date'], 'title': item['headline'], 'summary': item['summary'], 'market': ['kr', 'us'], 'tags': ['공개 학습판', item['lesson']['term']], 'status': 'published', 'url': 'daily/' + item['date'] + '.html'})
-    by_date.update({r['date']: r for r in entries})
-    entries = sorted(by_date.values(), key=lambda r: r['date'], reverse=True)
+        if item['date'] != path.stem.split('-r')[0]:
+            raise ValueError('Manuscript filename mismatch')
+        if (root / 'reports/daily' / (path.stem + '.html')).exists():
+            public_docs.append((item, path.stem))
+    public_docs.sort(key=lambda x:(x[0]['date'],x[0].get('revision',0)))
+    for item, stem in public_docs:
+        by_date[item['date']] = {'date':item['date'],'title':item['headline'],'summary':item['summary'],'market':['kr','us'],'tags':['공개 학습판',item['lesson']['term']],'status':'published','url':'daily/'+stem+'.html'}
+    entries = sorted(by_date.values(), key=lambda r:r['date'], reverse=True)
     (root / 'reports/index.json').write_text(json.dumps(entries, ensure_ascii=False, indent=2) + '\n')
-    if entries:
-        # A real fallback page works without JavaScript, no redirect race.
-        latest_day = next(r['date'] for r in entries if (root / 'content/daily' / (r['date'] + '.json')).exists())
-        latest_doc = json.loads((root / 'content/daily' / (latest_day + '.json')).read_text())
-        latest_html = (root / 'reports/daily' / (latest_day + '.html')).read_text()
+    if public_docs:
+        latest_doc, latest_stem = public_docs[-1]
+        latest_html = (root / 'reports/daily' / (latest_stem + '.html')).read_text()
         alias = latest_html.replace('href="../../', 'href="../').replace('src="../../', 'src="../')
         alias = alias.replace('href="../">리포트 아카이브', 'href="./">리포트 아카이브').replace('href="../">← 아카이브', 'href="./">← 아카이브')
         (root / 'reports/latest.html').write_text(alias)
         (root / 'data').mkdir(exist_ok=True)
-        snapshot = {'reportDate': latest_day, 'indices': latest_doc.get('indices', []), 'distribution': latest_doc.get('distribution', [])}
+        snapshot = {'reportDate':latest_doc['date'],'indices':latest_doc.get('indices',[]),'distribution':latest_doc.get('distribution',[]),'marketStatus':latest_doc.get('marketStatus',[])}
+        if market is not None and day.isoformat() == latest_doc['date']:
+            snapshot['checkedAt'] = market.get('checkedAt')
         (root / 'data/public-market.json').write_text(json.dumps(snapshot, ensure_ascii=False, indent=2) + '\n')
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', type=date.fromisoformat)
+    parser.add_argument('--market', action='store_true', help='Collect only permission-approved public closes')
     args = parser.parse_args()
     day = args.date or datetime.now(ZoneInfo('Asia/Seoul')).date()
     if not args.date and day.weekday() >= 5:
         print('Weekend: no scheduled study note')
         return
-    build(ROOT, day)
+    market = None
+    if args.market:
+        if day != datetime.now(ZoneInfo('Asia/Seoul')).date():
+            raise ValueError('Live collection cannot backfill a different report date')
+        try:
+            from .market_close import collect_default
+        except ImportError:
+            from market_close import collect_default
+        market = collect_default(ROOT)
+    build(ROOT, day, market=market)
     print('Built public study note:', day)
 
 if __name__ == '__main__':
