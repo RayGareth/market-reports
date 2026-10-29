@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-10-29",
+  "publication": "original_study",
+  "edition": "daily-study",
+  "headline": "2026-10-29 · 분산 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "분산",
+    "explanation": "여러 대상에 나누면 한 대상의 변화에만 결과가 좌우되는 정도를 줄일 수 있습니다. 손실 가능성이 없어지는 것은 아닙니다.",
+    "example": "이름이 다른 펀드라도 담고 있는 기업이 비슷할 수 있습니다. 이름보다 구성 내용을 살펴보면 분산의 의미가 더 잘 보입니다.",
+    "question": "분산에 대한 설명 중 알맞은 것은?",
+    "options": [
+      "손실을 완전히 없앤다",
+      "특정 대상에 대한 집중을 줄인다",
+      "상품 이름만 다르면 충분하다"
+    ],
+    "answer": 1,
+    "why": "분산은 집중을 줄이는 방법이며 손실을 없애는 보장은 아닙니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  },
+  "marketStatus": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "expectedAsOf": "2026-10-29",
+      "status": "rights_pending",
+      "message": "공개 게시 근거 확인 대기"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "expectedAsOf": "2026-10-29",
+      "status": "rights_pending",
+      "message": "공개 게시 근거 확인 대기"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "expectedAsOf": "2026-10-28",
+      "status": "rights_pending",
+      "message": "공개 게시 근거 확인 대기"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "expectedAsOf": "2026-10-28",
+      "status": "rights_pending",
+      "message": "공개 게시 근거 확인 대기"
+    }
+  ]
+}
