@@ -27,7 +27,8 @@
     change.textContent = item ? `${item.changePct > 0 ? '+' : ''}${item.changePct.toFixed(2)}%` : (labels[state?.status] || '검증 자료 미연결');
     const day = document.createElement('small'); day.className='metric-date';day.textContent=item ? item.asOf+' 기준' : state?.expectedAsOf||'';
     if(!item)strong.className='metric-pending';
-    card.append(label, strong, change, day);
+    card.append(label, strong);
+    if(item)card.append(change, day);
     target.append(card);
   };
   let indices=[], states=[], checkedAt='';
@@ -61,11 +62,23 @@
     for(const key of ['copyrightNotice','verificationCopyrightNotice'])if(item[key])notices.add(item[key]);
     notes.append(row);
   }
+  for(const name of ['KOSPI','KOSDAQ','S&P 500','NASDAQ']){
+    if(indices.some(x=>x.name===name))continue;
+    const state=states.find(x=>x.name===name);
+    const row=document.createElement('div');row.className='market-source-row market-source-pending';
+    const title=document.createElement('b');title.textContent=name;
+    const status=document.createElement('span');
+    status.textContent=state?.message||labels[state?.status]||'검증 자료 미연결';
+    row.dataset.status=state?.status||'unavailable';
+    row.append(title,status);
+    if(state?.expectedAsOf){const date=document.createElement('small');date.textContent='예상 기준 거래일: '+state.expectedAsOf+' · 확정 수치 미표시';row.append(date);}
+    notes.append(row);
+  }
   for(const text of notices){const n=document.createElement('p');n.className='market-source-copyright';n.textContent=text;notes.append(n);}
   const regionDate=region=>[...new Set(indices.filter(x=>x.region===region).map(x=>x.asOf))].join(' · ')||'확인 대기';
   const summary=document.getElementById('market-date-summary');
   summary.textContent=`국내: ${regionDate('kr')} / 미국: ${regionDate('us')} · 지표별 확정 종가 기준 · 실시간 시세가 아닙니다.`;
-  if(checkedAt){const n=document.createElement('div');n.className='sub';const date=new Date(checkedAt);if(!Number.isNaN(date.valueOf()))n.textContent='최근 수집 확인: '+date.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST';summary.append(n);}
+  if(checkedAt){const n=document.createElement('div');n.className='sub';const date=new Date(checkedAt);if(!Number.isNaN(date.valueOf()))n.textContent='데이터 상태 확인: '+date.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})+' KST';summary.append(n);}
   fitMarketNumbers();
   document.fonts?.ready.then(fitMarketNumbers);
   } finally { refreshing = false; }

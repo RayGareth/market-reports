@@ -209,3 +209,12 @@ body{background:#f7f5ef}
 @media(max-width:550px){#market-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#market-metrics .metric{padding:16px 12px}#market-metrics .metric strong{font-size:clamp(22px,6.7vw,32px);margin:12px 0 6px}#market-metrics .metric-change{font-size:19px}#market-metrics .metric-date{font-size:11px;margin-top:9px}}
 /* Keep long live closes prominent at the narrowest supported width. */
 @media(max-width:350px){#market-metrics .metric{padding-left:8px;padding-right:8px}}
+
+/* Keep unavailable metrics quiet; detailed causes remain in the disclosure. */
+#market-metrics .metric:has(.metric-pending){min-height:120px}
+#market-metrics .metric strong.metric-pending{font-size:18px;line-height:1.6;margin:14px 0 0;word-break:keep-all}
+.market-source-notes summary{min-height:44px;line-height:2;padding:6px 0}
+.market-source-pending small{font-size:12px;line-height:1.7}
+.report-article .market-region-pending{padding:12px 15px;background:#edf0e8;border-radius:10px;color:#52685a}
+.report-article .market-source-notes .report-status{margin:8px 0;overflow-wrap:anywhere}
+@media(max-width:350px){#market-metrics .metric strong.metric-pending{font-size:16px}}
