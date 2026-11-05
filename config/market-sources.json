@@ -2,8 +2,8 @@
   "calendarReviewedThrough": "2026-12-31",
   "providers": {
     "yahoo": {
-      "enabled": false,
-      "collectionAllowed": false,
+      "enabled": true,
+      "collectionAllowed": true,
       "family": "yahoo",
       "instruments": [
         "kospi",
@@ -17,20 +17,11 @@
         "sp500": "https://finance.yahoo.com/quote/%5EGSPC/history/",
         "nasdaq": "https://finance.yahoo.com/quote/%5EIXIC/history/"
       },
-      "public": {
-        "display": false,
-        "redistribution": false,
-        "derivedReturns": false,
-        "instruments": [],
-        "evidence": "",
-        "reviewedAt": "",
-        "validThrough": ""
-      },
       "label": "Yahoo Finance"
     },
     "naver": {
-      "enabled": false,
-      "collectionAllowed": false,
+      "enabled": true,
+      "collectionAllowed": true,
       "family": "naver",
       "instruments": [
         "kospi",
@@ -39,15 +30,6 @@
       "sourceUrls": {
         "kospi": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
         "kosdaq": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ"
-      },
-      "public": {
-        "display": false,
-        "redistribution": false,
-        "derivedReturns": false,
-        "instruments": [],
-        "evidence": "",
-        "reviewedAt": "",
-        "validThrough": ""
       },
       "label": "네이버 금융"
     },
@@ -63,20 +45,11 @@
         "kospi": "https://www.data.go.kr/data/15094807/openapi.do",
         "kosdaq": "https://www.data.go.kr/data/15094807/openapi.do"
       },
-      "public": {
-        "display": false,
-        "redistribution": false,
-        "derivedReturns": false,
-        "instruments": [],
-        "evidence": "",
-        "reviewedAt": "",
-        "validThrough": ""
-      },
       "label": "금융위원회 지수시세정보"
     },
     "fred": {
-      "enabled": false,
-      "collectionAllowed": false,
+      "enabled": true,
+      "collectionAllowed": true,
       "family": "fred",
       "instruments": [
         "sp500",
@@ -85,15 +58,6 @@
       "sourceUrls": {
         "sp500": "https://fred.stlouisfed.org/series/SP500",
         "nasdaq": "https://fred.stlouisfed.org/series/NASDAQCOM"
-      },
-      "public": {
-        "display": false,
-        "redistribution": false,
-        "derivedReturns": false,
-        "instruments": [],
-        "evidence": "",
-        "reviewedAt": "",
-        "validThrough": ""
       },
       "label": "FRED · 원자료 S&P DJI/Nasdaq"
     },
@@ -108,15 +72,6 @@
       "sourceUrls": {
         "kospi": "https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES001_S2.cmd?BO_ID=EREKZauXnMmxyIlqzeDN",
         "kosdaq": "https://openapi.krx.co.kr/contents/OPP/USES/service/OPPUSES001_S2.cmd?BO_ID=nimebcamqFNIPNcRrHoO"
-      },
-      "public": {
-        "display": false,
-        "redistribution": false,
-        "derivedReturns": false,
-        "instruments": [],
-        "evidence": "",
-        "reviewedAt": "",
-        "validThrough": ""
       },
       "label": "한국거래소 통계정보 · KRX OPEN API"
     }
