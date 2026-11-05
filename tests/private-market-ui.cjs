@@ -44,7 +44,7 @@ const server=http.createServer((req,res)=>{
    const detail=await context.newPage();await detail.goto(base+'/reports/'+latest.url);assert.equal(await detail.locator('.report-article>section').count(),4);
    assert.equal(await detail.locator('#usage-notice').count(),1);
    const rows=detail.locator('.market-close-table tbody tr');assert.equal(await rows.count(),data.indices.length);
-   for(const row of data.indices){const tableRow=rows.filter({hasText:row.name});assert((await tableRow.innerText()).includes(row.close.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})));assert((await tableRow.innerText()).includes(row.changePct.toFixed(2)+'%'));assert((await tableRow.innerText()).includes(row.asOf));}
+   for(const row of data.indices){const tableRow=rows.filter({hasText:row.name});assert((await tableRow.innerText()).includes(row.close.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})));assert((await tableRow.innerText()).includes((row.changePct>0?'+':row.changePct<0?'−':'')+Math.abs(row.changePct).toFixed(2)+'%'));assert((await tableRow.innerText()).includes(row.asOf));}
    const form=detail.locator('#market-quiz');await form.locator('input').first().check();await form.locator('button[type=submit]').click();assert(await detail.locator('#quiz-feedback').isVisible());
    assert(await detail.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await detail.getByRole('link',{name:'← 아카이브로 돌아가기'}).click();await detail.locator('.report-row').first().waitFor();await detail.locator('.report-row').first().click();assert(detail.url().endsWith(latest.url));await detail.close();
