@@ -1,4 +1,4 @@
-"""Session-aware, permission-gated public close pipeline (no raw persistence)."""
+"""Session-aware closing-price collection and cross-source validation."""
 import json
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
@@ -21,7 +21,7 @@ PUBLIC_PAIRS = {
     "us": ("yahoo", "fred"),
 }
 MESSAGES = {
-    'rights_pending':'공개 게시 근거 확인 대기',
+    'source_unavailable':'연결된 데이터 출처가 없습니다',
     'calendar_unavailable':'거래일 달력 확인이 필요합니다',
     'verification_unavailable':'비교 출처의 검증 자료가 없습니다',
     'missing':'최근 마감 자료가 아직 반영되지 않았습니다',
@@ -53,11 +53,14 @@ def session_pair(calendar_name, now, reviewed_through):
     return target, previous
 
 def public_allowed(policy, instrument, today):
-    grant = policy.get('public', {})
-    try:
-        return policy.get('enabled') is True and policy.get('collectionAllowed') is True and instrument in policy.get('instruments', []) and all(grant.get(k) is True for k in ('display','redistribution','derivedReturns')) and instrument in grant.get('instruments', []) and grant.get('evidence', '').startswith('https://') and date.fromisoformat(grant['reviewedAt']) <= today <= date.fromisoformat(grant['validThrough'])
-    except (KeyError, ValueError, TypeError):
-        return False
+    """An enabled normal data-source entry can participate in two-source checks."""
+    return (
+        policy.get('enabled') is True
+        and policy.get('collectionAllowed') is True
+        and instrument in policy.get('instruments', [])
+        and bool(policy.get('sourceUrls', {}).get(instrument, '').startswith('https://'))
+        and not policy.get('private')
+    )
 
 def checked_pair(bars, target, previous):
     from math import isfinite
@@ -102,7 +105,7 @@ def collect_private(config, now=None, adapters=None, calendar=session_pair, *, a
 
 def collect_region(config, region, existing=(), now=None, adapters=None, calendar=session_close,
                    verified_clock=None):
-    """Scheduled public refresh, with an explicit pair and permission-checked cache."""
+    """Scheduled regional refresh using one primary and one independent checker."""
     primary, checker = PUBLIC_PAIRS[region]
     verified_clock = verified_clock or (lambda: datetime.now(timezone.utc))
     config = {**config, "providers": {
@@ -123,8 +126,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             continue
         state = {'id':instrument,'name':meta['name'],'region':meta['region']}
         if region:
-            state.update(collection="not_attempted", crossCheck="not_attempted",
-                         publication="pending")
+            state.update(collection="not_attempted", crossCheck="not_attempted")
         try:
             target, previous, *close = calendar(meta['calendar'], now, config['calendarReviewedThrough'])
             if region:
@@ -137,9 +139,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
         if region and len(candidates) != len(PUBLIC_PAIRS[region]):
             candidates = []
         if not candidates:
-            state.update(status='rights_pending', message=MESSAGES['rights_pending'])
-            if region:
-                state["publication"] = "rights_pending"
+            state.update(status='source_unavailable', message=MESSAGES['source_unavailable'])
             statuses.append(state)
             continue
         retained = None
@@ -154,8 +154,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 if retained["closeAt"] == state["expectedCloseAt"]:
                     indices.append(retained)
                     state.update(status="verified", message=MESSAGES["verified"],
-                                 collection="complete", crossCheck="passed",
-                                 publication="approved_public")
+                                 collection="complete", crossCheck="passed")
                     statuses.append(state)
                     continue
                 # A changed exchange close time invalidates the cached session metadata.
@@ -193,10 +192,11 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             except ValueError:
                 failure = 'disagreement'
                 break  # Do not shop for an agreeing pair after a valid source disagrees.
-            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'verified':True, 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary), 'verificationSource':checkers[0][1]['sourceUrls'][instrument], 'verificationSourceName':checkers[0][1].get('label', checkers[0][0]), 'publication':{'status':'approved_public' if audience == 'public' else 'private_only','evidence':policy['public' if audience == 'public' else 'private']['evidence']}}
+            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'verified':True, 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary), 'verificationSource':checkers[0][1]['sourceUrls'][instrument], 'verificationSourceName':checkers[0][1].get('label', checkers[0][0])}
             if region:
                 row.update(closeAt=state["expectedCloseAt"], verifiedAt=verified_clock().isoformat())
             if audience == 'private':
+                row['publication'] = {'status':'private_only', 'evidence':policy['private']['evidence']}
                 row['copyrightNotice'] = policy['private'].get('copyrightNotice', '')
                 row['verificationCopyrightNotice'] = checkers[0][1]['private'].get('copyrightNotice', '')
             indices.append(row); state['status']='verified'; break
@@ -224,13 +224,12 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 collection="complete" if len(good) == 2 else ("partial" if good else "unavailable"),
                 crossCheck="passed" if state["status"] == "verified" else
                 ("failed" if state["status"] == "disagreement" else "pending"),
-                publication="approved_public" if state["status"] == "verified" else "pending",
             )
             if retained and state["status"] != "verified":
                 indices.append(retained)
                 state["message"] = MESSAGES["latest_pending"] + " · " + state["message"]
         statuses.append(state)
-    # Neither exception text, request URLs with credentials nor unapproved numbers leave this function.
+    # Never disclose provider errors or request URLs containing credentials.
     return {'indices':indices, 'marketStatus':statuses, 'checkedAt':now.isoformat()}
 
 def reusable_row(row, instrument, target, primary, checker):
@@ -241,10 +240,7 @@ def reusable_row(row, instrument, target, primary, checker):
     if row.get("asOf", "") > target.isoformat():
         return None
     if (row.get("source") != primary["sourceUrls"][instrument]
-            or row.get("verificationSource") != checker["sourceUrls"][instrument]
-            or row.get("publication") != {
-                "status": "approved_public", "evidence": primary["public"]["evidence"],
-            }):
+            or row.get("verificationSource") != checker["sourceUrls"][instrument]):
         return None
     return row
 
