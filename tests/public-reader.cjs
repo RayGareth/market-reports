@@ -41,8 +41,12 @@ const server=http.createServer((req,res)=>{
   await page.locator('#search').fill(entries[1].date);assert.equal(await page.locator('.report-row').count(),1);
   await page.locator('.report-row').click();assert(page.url().endsWith(entries[1].url));
   await page.goBack();await page.locator('.report-row').first().waitFor();await page.locator('#search').fill('no-matching-note');assert(await page.locator('#no-results').isVisible());
-  await page.locator('#search').fill('');await page.locator('#year').selectOption('2026');await page.locator('#month').selectOption('10');assert.equal(await page.locator('.report-row').count(),entries.length);
-  await page.locator('#month').selectOption('01');assert.equal(await page.locator('.report-row').count(),0);assert(await page.locator('#no-results').isVisible());
+  await page.locator('#search').fill('');
+  const [year, month]=entries[0].date.split('-');
+  await page.locator('#year').selectOption(year);await page.locator('#month').selectOption(month);
+  assert.equal(await page.locator('.report-row').count(),entries.filter(entry=>entry.date.startsWith(year+'-'+month)).length);
+  const emptyMonth=Array.from({length:12},(_,i)=>String(i+1).padStart(2,'0')).find(m=>!entries.some(entry=>entry.date.startsWith(year+'-'+m)));
+  if(emptyMonth){await page.locator('#month').selectOption(emptyMonth);assert.equal(await page.locator('.report-row').count(),0);assert(await page.locator('#no-results').isVisible());}
   assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
   assert.deepEqual(errors,[]);assert.deepEqual(missing,[]);assert.deepEqual(privateRequests,[]);
   results.push({width,rows:entries.length,sections:4,quiz:true,search:true,noOverflow:true,credentials:false});await context.close();
