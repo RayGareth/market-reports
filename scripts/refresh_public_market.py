@@ -35,7 +35,7 @@ def study_snapshot(snapshot, config, now):
                              collection="not_attempted", crossCheck="not_attempted", publication="pending")
             else:
                 expected = target.isoformat()
-                if state.get("expectedAsOf") != expected and state["status"] != "rights_pending":
+                if state.get("expectedAsOf") != expected and state["status"] != "source_unavailable":
                     state.update(status="missing", message=MESSAGES["latest_pending"],
                                  collection="not_attempted", crossCheck="not_attempted", publication="pending")
                 state.update(expectedAsOf=expected, expectedCloseAt=close.isoformat())
@@ -106,7 +106,7 @@ def refresh(root, region, now=None, collect=collect_region):
         updated[field] = sorted(untouched + result[field], key=lambda row: order.index(row["id"]))
 
     updated.setdefault("distribution", [])
-    # Use the existing allowlist/shape checks before writing public outputs.
+    # Validate the verified snapshot shape before writing the dashboard.
     doc = make_doc(day)
     doc.update(indices=updated["indices"], distribution=updated["distribution"])
     validate(doc)
