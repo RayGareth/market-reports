@@ -64,7 +64,8 @@
     if (item) {
       const tradeZone = item.region === 'us' ? 'ET' : 'KST';
       const checkTime = timestamp(item.verifiedAt);
-      row.append(element('span', `교차 검증 완료 · 기준 거래일 ${item.asOf} (${tradeZone})`));
+      const validation = item.verified ? '교차 검증 완료' : '단일 출처 · 비교 대기';
+      row.append(element('span', `${validation} · 기준 거래일 ${item.asOf} (${tradeZone})`));
       if (timestamp(item.closeAt)) row.append(element('span', '마감 ' + timestamp(item.closeAt)));
       if (item.previousAsOf) row.append(element('span', `비교 기준 ${item.previousAsOf} 종가`));
       if (checkTime) row.append(element('span', '검증 완료 ' + checkTime));

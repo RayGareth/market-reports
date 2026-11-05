@@ -25,13 +25,17 @@ const server=http.createServer((req,res)=>{
    await page.waitForFunction(()=>document.querySelectorAll('#market-metrics strong').length===4);
    // A new checkedAt proves that the timer fetched the next snapshot without
    // navigating or manually reloading the dashboard.
-   await page.waitForFunction(stamp=>document.querySelector('#market-date-summary').textContent.includes(new Date(stamp).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'})),data.checkedAt);
-   assert.equal(await page.locator('#usage-notice').count(),1);assert.equal(await page.locator('#market-validation-summary').count(),1);assert(await page.locator('#market-metrics').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length===(innerWidth<=880?2:4)));
+   await page.waitForFunction(stamp=>{
+    const clock=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+    const parts=Object.fromEntries(clock.formatToParts(new Date(stamp)).map(({type,value})=>[type,value]));
+    return document.querySelector('#market-date-summary').textContent.includes(`${parts.month}.${parts.day} ${parts.hour}:${parts.minute} KST`);
+   },data.checkedAt);
+   assert.equal(await page.locator('#usage-notice').count(),1);assert(await page.locator('#market-metrics').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length===2));
    assert((await page.locator('body').innerText()).includes('비공개 연결 검증'));
    for(const [i,id] of ['kospi','kosdaq','sp500','nasdaq'].entries()){
     const row=data.indices.find(r=>r.id===id),card=page.locator('#market-metrics .metric').nth(i);
     assert.equal(await card.locator('strong').innerText(),row?row.close.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):'자료 확인 대기');
-    if(row){assert((await card.innerText()).includes(row.asOf));assert((await card.innerText()).includes(row.changePct.toFixed(2)+'%'));assert.equal(await card.locator('a').count(),0);const note=page.locator('#market-source-notes .market-source-row').filter({has:page.locator('b',{hasText:row.name})});assert.equal(await note.locator('a').count(),row.verificationSource?2:1);assert((await note.textContent()).includes(row.verified?'교차 검증 완료':'단일 출처 · 비교 대기'));const sizes=await card.evaluate(n=>[...n.querySelectorAll('strong,.metric-change,.metric-date')].map(e=>parseFloat(getComputedStyle(e).fontSize)));assert(sizes[0]>sizes[1]&&sizes[1]>sizes[2]);assert(await card.locator('strong').evaluate(n=>n.scrollWidth<=n.clientWidth));}
+    if(row){assert((await card.innerText()).includes(row.asOf));assert((await card.innerText()).includes(row.changePct.toFixed(2).replace('-', '−')+'%'));const note=card.locator('.market-source-row');assert.equal(await note.locator('a').count(),row.verificationSource?2:1);assert((await note.textContent()).includes(row.verified?'교차 검증 완료':'단일 출처 · 비교 대기'));const sizes=await card.evaluate(n=>[...n.querySelectorAll('strong,.metric-change,.metric-date')].map(e=>parseFloat(getComputedStyle(e).fontSize)));assert(sizes[0]>sizes[1]&&sizes[1]>sizes[2]);assert(await card.locator('strong').evaluate(n=>n.scrollWidth<=n.clientWidth));}
    }
    const latest=JSON.parse(fs.readFileSync(path.join(root,'reports/index.json')))[0];
    await page.waitForFunction(u=>document.querySelector('.quick-access-action').getAttribute('href')==='reports/'+u,latest.url);

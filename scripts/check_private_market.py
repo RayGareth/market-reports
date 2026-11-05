@@ -39,7 +39,13 @@ def preview(root, market, now):
     page.write_text(page.read_text().replace('<body>', '<body><div class="notice">' + BANNER + '</div>'))
     # Only this disposable loopback copy accepts private observations.
     script = root / 'assets/market.js'
-    script.write_text(script.read_text().replace("x.verified===true&&x.publication", "(x.verified===true||x.validated===true)&&x.publication").replace("status==='approved_public'", "status==='private_only'"))
+    public_filter = "x.verified === true && x.publication?.status === 'approved_public'"
+    private_filter = ("(x.verified === true || (x.validated === true && x.verificationStatus === 'pending'))"
+                      " && x.publication?.status === 'private_only'")
+    source = script.read_text()
+    if source.count(public_filter) != 1:
+        raise ValueError('Private preview requires exactly one replaceable publication filter')
+    script.write_text(source.replace(public_filter, private_filter))
     latest = root / 'assets/latest.js'
     latest.write_text(latest.read_text().replace('공개 학습판', '비공개 검증판'))
     day = now.astimezone(ZoneInfo('Asia/Seoul')).date()
