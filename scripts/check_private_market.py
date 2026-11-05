@@ -39,9 +39,9 @@ def preview(root, market, now):
     page.write_text(page.read_text().replace('<body>', '<body><div class="notice">' + BANNER + '</div>'))
     # Only this disposable loopback copy accepts private observations.
     script = root / 'assets/market.js'
-    public_filter = "x.verified === true && x.publication?.status === 'approved_public'"
+    public_filter = "x.verified === true && /^https:\\/\\//.test(x.source)"
     private_filter = ("(x.verified === true || (x.validated === true && x.verificationStatus === 'pending'))"
-                      " && x.publication?.status === 'private_only'")
+                      " && /^https:\\/\\//.test(x.source) && x.publication?.status === 'private_only'")
     source = script.read_text()
     if source.count(public_filter) != 1:
         raise ValueError('Private preview requires exactly one replaceable publication filter')
