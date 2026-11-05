@@ -37,13 +37,7 @@ class Source:
 def configuration():
     config = json.loads((ROOT / "config/market-sources.json").read_text())
     for key in ("yahoo", "naver", "fred"):
-        provider = config["providers"][key]
-        provider.update(enabled=True, collectionAllowed=True)
-        provider["public"].update(
-            display=True, redistribution=True, derivedReturns=True,
-            instruments=provider["instruments"], evidence="https://example.invalid/test-only",
-            reviewedAt="2026-01-01", validThrough=REVIEWED,
-        )
+        config["providers"][key].update(enabled=True, collectionAllowed=True)
     return config
 
 
@@ -74,7 +68,7 @@ class RegionalRefreshTests(unittest.TestCase):
         page = generate(document)
         self.assertIn('class="market-down">−0.85%</td>', page)
 
-    def test_exact_pairs_and_explicit_public_rights(self):
+    def test_exact_cross_check_pairs_and_source_switches(self):
         cfg = configuration()
         adapters = {key: Source() for key in ("yahoo", "naver", "fred", "fsc")}
         kr = collect(cfg, "kr", adapters=adapters)
@@ -83,12 +77,12 @@ class RegionalRefreshTests(unittest.TestCase):
         self.assertEqual(adapters["fred"].calls, [])
         self.assertEqual(adapters["fsc"].calls, [])
 
-        cfg["providers"]["fred"]["public"]["redistribution"] = False
+        cfg["providers"]["fred"]["enabled"] = False
         blocked = collect(cfg, "us", adapters=adapters)
         self.assertEqual(blocked["indices"], [])
         self.assertEqual(adapters["fred"].calls, [])
         self.assertEqual(adapters["yahoo"].calls, ["kospi", "kosdaq"])
-        self.assertTrue(all(state["publication"] == "rights_pending" for state in blocked["marketStatus"]))
+        self.assertTrue(all(state["status"] == "source_unavailable" for state in blocked["marketStatus"]))
 
     def test_delayed_us_close_updates_matching_date_as_revision(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -151,7 +145,7 @@ class RegionalRefreshTests(unittest.TestCase):
         self.assertEqual(adapters["yahoo"].calls, [])
         self.assertEqual(evening["indices"], afternoon["indices"])
 
-    def test_retains_old_verified_quote_with_original_dates_only_while_authorized(self):
+    def test_retains_old_verified_quote_with_original_dates_when_sources_work(self):
         cfg = configuration()
         old = collect(cfg, "us")["indices"][0]
         old.update(asOf=PREVIOUS.isoformat(), closeAt="2026-11-03T21:00:00+00:00",
@@ -161,7 +155,7 @@ class RegionalRefreshTests(unittest.TestCase):
         self.assertEqual(result["indices"], [old])
         self.assertEqual(result["marketStatus"][0]["expectedAsOf"], DAY.isoformat())
         self.assertIn("최신 거래일 검증 대기", result["marketStatus"][0]["message"])
-        cfg["providers"]["fred"]["public"]["validThrough"] = PREVIOUS.isoformat()
+        cfg["providers"]["fred"]["enabled"] = False
         result = collect(cfg, "us", [old], adapters=adapters)
         self.assertEqual(result["indices"], [])
 
@@ -237,6 +231,11 @@ class RegionalRefreshTests(unittest.TestCase):
             )
             (kr / "config").mkdir()
             shutil.copy(ROOT / "config/market-sources.json", kr / "config/market-sources.json")
+            # An isolated Git concurrency fixture must never request live prices.
+            isolated = json.loads((kr / "config/market-sources.json").read_text())
+            for provider in isolated["providers"].values():
+                provider.update(enabled=False, collectionAllowed=False)
+            (kr / "config/market-sources.json").write_text(json.dumps(isolated))
             git(kr, "add", ".")
             git(kr, "commit", "-m", "baseline")
             git(kr, "push", "origin", "main")
