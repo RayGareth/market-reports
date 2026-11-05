@@ -39,8 +39,17 @@ def https(value):
     return isinstance(value, str) and value.startswith('https://') and len(value) > 8
 
 def approved(item, audience='public'):
-    rights = item.get('publication', {})
-    return (item.get('verified') is True or (audience == 'private' and item.get('validated') is True and item.get('verificationStatus') == 'pending')) and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
+    if audience == 'private':
+        access = item.get('publication', {})
+        return (
+            (item.get('verified') is True
+             or (item.get('validated') is True and item.get('verificationStatus') == 'pending'))
+            and access.get('status') == 'private_only'
+            and https(access.get('evidence')) and https(item.get('source'))
+        )
+    # Only independently verified, source-attributed rows enter the public study.
+    return (item.get('verified') is True and https(item.get('source'))
+            and item.get('publication', {}).get('status') != 'private_only')
 
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
@@ -55,7 +64,7 @@ def validate(doc, audience='public'):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
         if not approved(item, audience):
-            raise ValueError('Unconfirmed market-data publication permission: refusing to render')
+            raise ValueError('Unverified or unattributed market row: refusing to render')
         date.fromisoformat(item['asOf'])
         if item.get('verificationSource') and not https(item['verificationSource']):
             raise ValueError('Invalid verification source')
@@ -67,7 +76,7 @@ def validate(doc, audience='public'):
             raise ValueError('Invalid closing figures')
     for item in doc.get('distribution', []):
         if not approved(item):
-            raise ValueError('Unconfirmed distribution publication permission')
+            raise ValueError('Unverified or unattributed distribution')
         date.fromisoformat(item['asOf'])
         if item.get('name') not in ('KOSPI', 'KOSDAQ'):
             raise ValueError('Invalid distribution market')
@@ -75,7 +84,7 @@ def validate(doc, audience='public'):
             raise ValueError('Invalid distribution counts')
     for item in doc.get('issues', []):
         if not approved(item) or not item.get('fact'):
-            raise ValueError('News needs verified facts, source and publication approval')
+            raise ValueError('News needs verified facts and source')
 
 def make_doc(day, backfill=False):
     lesson = dict(LESSONS[(day - date(2026, 10, 12)).days % len(LESSONS)])
@@ -195,7 +204,7 @@ def build(root, day, backfill=False, market=None):
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
-        validate(enriched)  # Never write an unapproved observation, even to a manuscript.
+        validate(enriched)  # Keep unverified observations out of the manuscript.
         if original_target.exists() or manuscript.exists():
             if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
                 enriched['revision'] = int(current.get('revision', 0)) + 1
@@ -258,7 +267,7 @@ def build(root, day, backfill=False, market=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', type=date.fromisoformat)
-    parser.add_argument('--market', action='store_true', help='Collect only permission-approved public closes')
+    parser.add_argument('--market', action='store_true', help='Collect cross-verified closing-price observations')
     args = parser.parse_args()
     day = args.date or datetime.now(ZoneInfo('Asia/Seoul')).date()
     if not args.date and day.weekday() >= 5:
