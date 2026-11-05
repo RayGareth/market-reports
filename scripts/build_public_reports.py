@@ -86,6 +86,19 @@ def make_doc(day, backfill=False):
             'summary': '시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.',
             'indices': [], 'distribution': [], 'issues': [], 'lesson': lesson}
 
+def market_close_label(value):
+    """Market close timestamp displayed in Korean local time."""
+    if not value:
+        return ''
+    try:
+        instant = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except (ValueError, TypeError, AttributeError):
+        return ''
+    if instant.tzinfo is None:
+        return ''
+    return instant.astimezone(ZoneInfo('Asia/Seoul')).strftime('%m.%d %H:%M KST')
+
+
 def generate(doc, audience='public'):
     validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
@@ -96,7 +109,11 @@ def generate(doc, audience='public'):
         if rows:
             overview += '<div class="market-table-wrap"><table class="market-close-table"><thead><tr><th>시장</th><th>확정 종가</th><th>등락률</th><th>기준일</th></tr></thead><tbody>'
             for row in rows:
-                overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
+                change = row['changePct']
+                direction = 'market-up' if change > 0 else 'market-down' if change < 0 else 'market-flat'
+                sign = '+' if change > 0 else '−' if change < 0 else ''
+                change_label = sign + format(abs(change), '.2f') + '%'
+                overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td class="' + direction + '">' + esc(change_label) + '</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
 
         else:
@@ -112,7 +129,15 @@ def generate(doc, audience='public'):
             overview += '<div class="market-source-row"><b>' + esc(row['name']) + '</b><span>' + verification
             if row.get('previousAsOf'):
                 overview += ' · ' + esc(row['previousAsOf']) + ' 종가 대비'
-            overview += '</span><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
+            overview += '</span>'
+            close_label = market_close_label(row.get('closeAt'))
+            if close_label:
+                overview += '<span>마감 ' + esc(close_label) + '</span>'
+            if row.get('verifiedAt'):
+                verified_label = market_close_label(row['verifiedAt'])
+                if verified_label:
+                    overview += '<span>검증 완료 ' + esc(verified_label) + '</span>'
+            overview += '<a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
             if row.get('verificationSource'):
                 overview += '<a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('verificationSourceName', '비교 출처')) + ' ↗</a>'
             overview += '</div>'
