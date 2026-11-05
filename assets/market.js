@@ -2,7 +2,7 @@
   const names = ['KOSPI', 'KOSDAQ', 'S&P 500', 'NASDAQ'];
   const labels = {
     verification_unavailable: '비교 출처의 검증 자료가 없습니다',
-    rights_pending: '공개 게시 근거 확인 대기',
+    source_unavailable: '연결된 데이터 출처가 없습니다',
     calendar_unavailable: '거래일 달력 확인 필요',
     missing: '최근 마감 자료 미반영',
     provider_error: '데이터 확인 실패',
@@ -107,8 +107,8 @@
         checkedAt = data.checkedAt;
         states = Array.isArray(data.marketStatus) ? data.marketStatus : [];
         indices = (Array.isArray(data.indices) ? data.indices : []).filter(x =>
-          x.verified === true && x.publication?.status === 'approved_public' &&
-          /^https:\/\//.test(x.publication?.evidence) && /^https:\/\//.test(x.source) &&
+          x.verified === true && /^https:\/\//.test(x.source) &&
+          x.publication?.status !== 'private_only' &&
           Number.isFinite(x.close) && x.close > 0 && Number.isFinite(x.changePct) &&
           /^20\d{2}-\d{2}-\d{2}$/.test(x.asOf));
       } catch { /* Never show unverified data or invent a closing date. */ }
