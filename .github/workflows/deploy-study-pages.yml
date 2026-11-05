@@ -1,0 +1,33 @@
+name: Deploy latest public Market Daily
+on:
+  workflow_call:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: market-daily-public-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Prepare public-only Pages artifact from latest main
+        run: |
+          mkdir -p "$RUNNER_TEMP/market-pages/data"
+          cp index.html "$RUNNER_TEMP/market-pages/"
+          cp -R assets reports "$RUNNER_TEMP/market-pages/"
+          cp data/public-market.json "$RUNNER_TEMP/market-pages/data/"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/market-pages
+      - name: Deploy approved public artifact
+        id: deployment
+        uses: actions/deploy-pages@v4
