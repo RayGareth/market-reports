@@ -7,6 +7,7 @@ import unittest
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+from scripts.build_public_reports import generate, make_doc, market_close_label
 from scripts.market_close import collect_region, session_close
 from scripts.market_sources import Bar
 from scripts.publish_public_study import publish
@@ -60,6 +61,19 @@ def git(repo, *args):
 
 
 class RegionalRefreshTests(unittest.TestCase):
+    def test_section_01_closing_timestamp_and_signed_change(self):
+        self.assertEqual(market_close_label("2026-11-04T21:00:00+00:00"), "11.05 06:00 KST")
+        self.assertEqual(market_close_label("invalid"), "")
+        document = make_doc(DAY)
+        index = collect(configuration(), "us")["indices"][0]
+        document["indices"] = [index]
+        page = generate(document)
+        self.assertIn("마감 11.05 06:00 KST", page)
+        self.assertIn('class="market-up">+1.00%</td>', page)
+        index["changePct"] = -0.85
+        page = generate(document)
+        self.assertIn('class="market-down">−0.85%</td>', page)
+
     def test_exact_pairs_and_explicit_public_rights(self):
         cfg = configuration()
         adapters = {key: Source() for key in ("yahoo", "naver", "fred", "fsc")}
