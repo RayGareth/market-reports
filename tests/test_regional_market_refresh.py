@@ -7,11 +7,11 @@ import unittest
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from scripts.build_public_reports import generate, make_doc, market_close_label
+from scripts.build_public_reports import build, generate, make_doc, market_close_label
 from scripts.market_close import collect_region, session_close
 from scripts.market_sources import Bar
 from scripts.publish_public_study import publish
-from scripts.refresh_public_market import refresh
+from scripts.refresh_public_market import refresh, revise_dated_study
 
 ROOT = Path(__file__).resolve().parents[1]
 REVIEWED = "2026-12-31"
@@ -89,6 +89,44 @@ class RegionalRefreshTests(unittest.TestCase):
         self.assertEqual(adapters["fred"].calls, [])
         self.assertEqual(adapters["yahoo"].calls, ["kospi", "kosdaq"])
         self.assertTrue(all(state["publication"] == "rights_pending" for state in blocked["marketStatus"]))
+
+    def test_delayed_us_close_updates_matching_date_as_revision(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(repo, DAY)
+            report = repo / "reports/daily/2026-11-04.html"
+            original = report.read_bytes()
+
+            # Thu 08:00 KST receives Wed U.S. closes.
+            refresh(repo, "us", MORNING, collect)
+            revision = repo / "reports/daily/2026-11-04-r001.html"
+            self.assertTrue(revision.is_file())
+            self.assertEqual(report.read_bytes(), original)
+            self.assertIn("101.00", revision.read_text())
+            self.assertIn("마감 11.05 06:00 KST", revision.read_text())
+            archive = json.loads((repo / "reports/index.json").read_text())
+            self.assertEqual(archive[0]["url"], "daily/2026-11-04-r001.html")
+            self.assertEqual(json.loads((repo / "data/public-market.json").read_text())["reportDate"],
+                             DAY.isoformat())
+
+            # A successful repeat check must not create a duplicate revision.
+            refresh(repo, "us", MORNING + timedelta(hours=6), collect)
+            self.assertEqual(len(list(report.parent.glob("2026-11-04-r*.html"))), 1)
+            self.assertFalse((repo / "reports/daily/2026-11-05.html").exists())
+
+    def test_kr_late_close_updates_existing_study_as_revision(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            build(repo, DAY)
+            report = repo / "reports/daily/2026-11-04.html"
+            original = report.read_bytes()
+            result = collect(configuration(), "kr")
+            self.assertTrue(revise_dated_study(repo, DAY, "kr", result))
+            self.assertTrue((repo / "reports/daily/2026-11-04-r001.html").is_file())
+            self.assertEqual(report.read_bytes(), original)
+            self.assertFalse(revise_dated_study(repo, DAY, "kr", result))
 
     def test_us_retries_only_missing_index_and_preserves_verification_time(self):
         cfg = configuration()
