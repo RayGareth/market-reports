@@ -30,38 +30,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          python scripts/publish_public_study.py
-        env:
-          TZ: Asia/Seoul
-          KRX_API_KEY: ${{ secrets.KRX_API_KEY }}
-          FSC_API_KEY: ${{ secrets.FSC_API_KEY }}
-      - name: Reload published main for Pages
-        if: vars.MARKET_PAGES_DEPLOY == 'true'
-        run: |
-          git fetch origin main
-          git checkout --detach FETCH_HEAD
-      - name: Prepare public-only Pages artifact
-        if: vars.MARKET_PAGES_DEPLOY == 'true'
-        run: |
-          mkdir -p "$RUNNER_TEMP/market-pages/data"
-          cp index.html "$RUNNER_TEMP/market-pages/"
-          cp -R assets reports "$RUNNER_TEMP/market-pages/"
-          cp data/public-market.json "$RUNNER_TEMP/market-pages/data/"
-      - uses: actions/upload-pages-artifact@v3
-        if: vars.MARKET_PAGES_DEPLOY == 'true'
-        with:
-          path: ${{ runner.temp }}/market-pages
+          python scripts/publish_public_study.py --region kr
   deploy:
     if: vars.MARKET_PAGES_DEPLOY == 'true'
     needs: publish
-    runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy approved public artifact
-        id: deployment
-        uses: actions/deploy-pages@v4
+    uses: ./.github/workflows/deploy-study-pages.yml

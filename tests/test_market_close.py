@@ -24,16 +24,19 @@ class Fake:
 def calendar(name,now,through):return date(2026,10,26),date(2026,10,23)
 def config():
     return {'calendarReviewedThrough':'2026-12-31','providers':{
-      key:{'enabled':True,'collectionAllowed':True,'family':key,'instruments':['kospi'], 'sourceUrls':{'kospi':'https://example.invalid/'+key}, 'public':{'display':key=='primary','redistribution':key=='primary','derivedReturns':key=='primary','instruments':['kospi'],'evidence':'https://example.invalid/test-license','reviewedAt':'2026-01-01','validThrough':'2026-12-31'}} for key in ['primary','check']}}
+      key:{'enabled':True,'collectionAllowed':True,'family':key,'instruments':['kospi'], 'sourceUrls':{'kospi':'https://example.invalid/'+key}} for key in ['primary','check']}}
 
 class CloseTests(unittest.TestCase):
-    def test_default_registry_never_fetches_or_emits_unapproved_values(self):
+    def test_default_registry_uses_only_configured_sources_and_redacts_errors(self):
         cfg=json.loads((ROOT/'config/market-sources.json').read_text())
-        adapters={k:Fake(error=AssertionError('must never fetch')) for k in cfg['providers']}
+        adapters={k:Fake(error=RuntimeError('SECRET_TOKEN_9876')) for k in cfg['providers']}
         result=app.collect(cfg,NOW,adapters,calendar)
         self.assertEqual(result['indices'],[])
-        self.assertTrue(all(s['status']=='rights_pending' for s in result['marketStatus']))
-        self.assertTrue(all(a.calls==0 for a in adapters.values()))
+        self.assertTrue(all(s['status']=='provider_error' for s in result['marketStatus']))
+        self.assertTrue(all(adapters[k].calls>0 for k in ('yahoo','naver','fred')))
+        self.assertEqual(adapters['fsc'].calls, 0)
+        self.assertEqual(adapters['krx'].calls, 0)
+        self.assertNotIn('SECRET_TOKEN', json.dumps(result))
 
     def test_cross_check_and_rate(self):
         result=app.collect(config(),NOW,{'primary':Fake(),'check':Fake()},calendar)
@@ -54,8 +57,8 @@ class CloseTests(unittest.TestCase):
                 self.assertNotIn('SECRET_KEY',json.dumps(result))
                 self.assertNotIn('9876',json.dumps(result))
 
-    def test_cannot_bypass_expired_grant_or_same_family(self):
-        cfg=config();cfg['providers']['primary']['public']['validThrough']='2026-10-25'
+    def test_requires_enabled_sources_and_independent_families(self):
+        cfg=config();cfg['providers']['primary']['enabled']=False
         self.assertEqual(app.collect(cfg,NOW,{'primary':Fake(),'check':Fake()},calendar)['indices'],[])
         cfg=config();cfg['providers']['check']['family']='primary'
         self.assertEqual(app.collect(cfg,NOW,{'primary':Fake(),'check':Fake()},calendar)['indices'],[])
@@ -108,16 +111,15 @@ class CloseTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 KrxProvider(lambda *a,**kw:transport(a[0],{'basDd':'20261022'})).fetch_pair('kospi',date(2026,10,26),date(2026,10,23))
 
-    def test_diagnostic_is_separate_from_public_rights_and_redacts_prices(self):
+    def test_diagnostic_suppresses_prices_and_reports_cross_checks(self):
         from check_market_connection import diagnose
         cfg=config()
-        cfg['providers']['primary']['public']['display']=False
         adapters={'primary':Fake(),'check':Fake()}
         result=diagnose(cfg,NOW,adapters)
         self.assertEqual(result['instruments'][0]['crossCheck'],'passed')
         self.assertFalse(result['publicDataWritten'])
         self.assertNotIn('101',json.dumps(result))
-        self.assertEqual(app.collect(cfg,NOW,adapters,calendar)['indices'],[])
+        self.assertEqual(len(app.collect(cfg,NOW,adapters,calendar)['indices']), 1)
         broken=diagnose(cfg,NOW,{'primary':Fake(error=RuntimeError('SECRET_PRICE_9876')),'check':Fake()})
         self.assertNotIn('SECRET_PRICE',json.dumps(broken))
         self.assertNotIn('9876',json.dumps(broken))

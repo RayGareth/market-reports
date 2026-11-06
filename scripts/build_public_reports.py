@@ -39,8 +39,17 @@ def https(value):
     return isinstance(value, str) and value.startswith('https://') and len(value) > 8
 
 def approved(item, audience='public'):
-    rights = item.get('publication', {})
-    return (item.get('verified') is True or (audience == 'private' and item.get('validated') is True and item.get('verificationStatus') == 'pending')) and rights.get('status') == ('private_only' if audience == 'private' else 'approved_public') and https(rights.get('evidence')) and https(item.get('source'))
+    if audience == 'private':
+        access = item.get('publication', {})
+        return (
+            (item.get('verified') is True
+             or (item.get('validated') is True and item.get('verificationStatus') == 'pending'))
+            and access.get('status') == 'private_only'
+            and https(access.get('evidence')) and https(item.get('source'))
+        )
+    # Only independently verified, source-attributed rows enter the public study.
+    return (item.get('verified') is True and https(item.get('source'))
+            and item.get('publication', {}).get('status') != 'private_only')
 
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
@@ -55,7 +64,7 @@ def validate(doc, audience='public'):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
         if not approved(item, audience):
-            raise ValueError('Unconfirmed market-data publication permission: refusing to render')
+            raise ValueError('Unverified or unattributed market row: refusing to render')
         date.fromisoformat(item['asOf'])
         if item.get('verificationSource') and not https(item['verificationSource']):
             raise ValueError('Invalid verification source')
@@ -67,7 +76,7 @@ def validate(doc, audience='public'):
             raise ValueError('Invalid closing figures')
     for item in doc.get('distribution', []):
         if not approved(item):
-            raise ValueError('Unconfirmed distribution publication permission')
+            raise ValueError('Unverified or unattributed distribution')
         date.fromisoformat(item['asOf'])
         if item.get('name') not in ('KOSPI', 'KOSDAQ'):
             raise ValueError('Invalid distribution market')
@@ -75,7 +84,7 @@ def validate(doc, audience='public'):
             raise ValueError('Invalid distribution counts')
     for item in doc.get('issues', []):
         if not approved(item) or not item.get('fact'):
-            raise ValueError('News needs verified facts, source and publication approval')
+            raise ValueError('News needs verified facts and source')
 
 def make_doc(day, backfill=False):
     lesson = dict(LESSONS[(day - date(2026, 10, 12)).days % len(LESSONS)])
@@ -85,6 +94,19 @@ def make_doc(day, backfill=False):
             'headline': day.isoformat() + ' · ' + lesson['term'] + ' 함께 읽기',
             'summary': '시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.',
             'indices': [], 'distribution': [], 'issues': [], 'lesson': lesson}
+
+def market_close_label(value):
+    """Market close timestamp displayed in Korean local time."""
+    if not value:
+        return ''
+    try:
+        instant = datetime.fromisoformat(value.replace('Z', '+00:00'))
+    except (ValueError, TypeError, AttributeError):
+        return ''
+    if instant.tzinfo is None:
+        return ''
+    return instant.astimezone(ZoneInfo('Asia/Seoul')).strftime('%m.%d %H:%M KST')
+
 
 def generate(doc, audience='public'):
     validate(doc, audience)
@@ -96,7 +118,11 @@ def generate(doc, audience='public'):
         if rows:
             overview += '<div class="market-table-wrap"><table class="market-close-table"><thead><tr><th>시장</th><th>확정 종가</th><th>등락률</th><th>기준일</th></tr></thead><tbody>'
             for row in rows:
-                overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td>' + format(row['changePct'], '+.2f') + '%</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
+                change = row['changePct']
+                direction = 'market-up' if change > 0 else 'market-down' if change < 0 else 'market-flat'
+                sign = '+' if change > 0 else '−' if change < 0 else ''
+                change_label = sign + format(abs(change), '.2f') + '%'
+                overview += '<tr><th>' + esc(row['name']) + '</th><td>' + format(row['close'], ',.2f') + '</td><td class="' + direction + '">' + esc(change_label) + '</td><td><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row['asOf']) + '</a></td></tr>'
             overview += '</tbody></table></div>'
 
         else:
@@ -112,7 +138,15 @@ def generate(doc, audience='public'):
             overview += '<div class="market-source-row"><b>' + esc(row['name']) + '</b><span>' + verification
             if row.get('previousAsOf'):
                 overview += ' · ' + esc(row['previousAsOf']) + ' 종가 대비'
-            overview += '</span><a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
+            overview += '</span>'
+            close_label = market_close_label(row.get('closeAt'))
+            if close_label:
+                overview += '<span>마감 ' + esc(close_label) + '</span>'
+            if row.get('verifiedAt'):
+                verified_label = market_close_label(row['verifiedAt'])
+                if verified_label:
+                    overview += '<span>검증 완료 ' + esc(verified_label) + '</span>'
+            overview += '<a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
             if row.get('verificationSource'):
                 overview += '<a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('verificationSourceName', '비교 출처')) + ' ↗</a>'
             overview += '</div>'
@@ -170,7 +204,7 @@ def build(root, day, backfill=False, market=None):
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
-        validate(enriched)  # Never write an unapproved observation, even to a manuscript.
+        validate(enriched)  # Keep unverified observations out of the manuscript.
         if original_target.exists() or manuscript.exists():
             if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
                 enriched['revision'] = int(current.get('revision', 0)) + 1
@@ -233,7 +267,7 @@ def build(root, day, backfill=False, market=None):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--date', type=date.fromisoformat)
-    parser.add_argument('--market', action='store_true', help='Collect only permission-approved public closes')
+    parser.add_argument('--market', action='store_true', help='Collect cross-verified closing-price observations')
     args = parser.parse_args()
     day = args.date or datetime.now(ZoneInfo('Asia/Seoul')).date()
     if not args.date and day.weekday() >= 5:

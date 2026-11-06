@@ -23,25 +23,30 @@ const server=http.createServer((req,res)=>{
   await visit('/');await p.waitForFunction(()=>document.querySelectorAll('#market-metrics .metric-pending').length===4);
   assert.equal(await p.locator('#market-metrics .metric-change,#market-metrics .metric-date').count(),0);
   assert.deepEqual(await p.locator('#market-metrics strong').allTextContents(),Array(4).fill('자료 확인 대기'));
-  assert.equal(await p.locator('#market-source-notes .market-source-pending').count(),4);
-  for(const s of snapshot.marketStatus)assert((await p.locator('#market-source-notes').textContent()).includes(s.message));
+  assert.equal(await p.locator('#market-metrics .market-source-pending').count(),4);
+  for(const s of snapshot.marketStatus)assert((await p.locator('#market-metrics').textContent()).includes(s.message));
   assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await capture('dashboard-after','section[aria-labelledby=temperature]');
-  await p.locator('#market-source-notes summary').click();assert(await p.locator('#market-source-notes').evaluate(n=>n.open));
-  assert((await p.locator('#market-source-notes summary').boundingBox()).height>=44);
-  await p.clock.fastForward(60000);await p.waitForTimeout(100);assert(await p.locator('#market-source-notes').evaluate(n=>n.open));assert.equal(await p.locator('#market-source-notes .market-source-pending').count(),4);
+  await p.locator('#market-metrics summary').first().click();assert(await p.locator('#market-metrics details').first().evaluate(n=>n.open));
+  assert((await p.locator('#market-metrics summary').first().boundingBox()).height>=44);
+  await p.clock.fastForward(60000);await p.waitForTimeout(100);assert(await p.locator('#market-metrics details').first().evaluate(n=>n.open));assert.equal(await p.locator('#market-metrics .market-source-pending').count(),4);
   await visit('/reports/'+entries[0].url);await p.waitForFunction(()=>document.querySelector('article.report-article > section').dataset.marketCompact==='true');
   const section=p.locator('article.report-article > section').first();assert.equal(await section.locator('h3').count(),2);assert.equal(await section.locator('.market-region-pending').count(),2);
   assert.equal(await section.locator('details').count(),1);assert.equal(await section.locator('details').evaluate(n=>n.open),false);
-  for(const s of snapshot.marketStatus){assert((await section.locator('details').textContent()).includes(s.name));assert((await section.locator('details').textContent()).includes(s.expectedAsOf));}
+  for(const s of snapshot.marketStatus){assert((await section.locator('details').textContent()).includes(s.name));}
   await capture('section-after','article.report-article > section:first-child');assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   // A mixed response keeps causes separate and never turns expected dates into quotes.
-  const mixed=structuredClone(snapshot);mixed.indices=[{id:'nasdaq',name:'NASDAQ',region:'us',asOf:'2026-10-29',close:123456.78,changePct:-12.34,source:'https://example.invalid/synthetic',verificationSource:'https://example.invalid/check',verified:true,publication:{status:'approved_public',evidence:'https://example.invalid/fixture'}}];
-  mixed.marketStatus=mixed.marketStatus.map((s,i)=>({...s,status:['missing','provider_error','disagreement','verified'][i],message:['최근 자료 지연','수집 응답 오류','출처 간 수치 불일치','교차 검증 완료'][i]}));
+  const mixed=structuredClone(snapshot);mixed.indices=[{id:'nasdaq',name:'NASDAQ',region:'us',asOf:'2026-10-29',close:123456.78,changePct:-12.34,closeAt:'2026-10-29T20:00:00Z',verifiedAt:'2026-10-30T00:00:00Z',source:'https://example.invalid/synthetic',verificationSource:'https://example.invalid/check',verified:true,publication:{status:'approved_public',evidence:'https://example.invalid/fixture'}}];
+  mixed.marketStatus=mixed.marketStatus.map((s,i)=>({...s,status:['missing','provider_error','disagreement','missing'][i],message:['최근 자료 지연','수집 응답 오류','출처 간 수치 불일치','최신 거래일 자료 미도착'][i]}));
+  mixed.marketStatus[3].expectedAsOf='2026-10-30';
   await p.route('**/data/public-market.json',r=>r.fulfill({json:mixed}));await visit('/');await p.waitForFunction(()=>document.querySelectorAll('#market-metrics .metric-change').length===1);
-  const card=p.locator('#market-metrics .metric').last();assert.match(await card.innerText(),/123,456.78[\s\S]*-12.34%[\s\S]*2026-10-29/);
+  const card=p.locator('#market-metrics .metric').last();assert.match(await card.innerText(),/123,456\.78[\s\S]*마감 10\.30 05:00 KST[\s\S]*−12\.34%[\s\S]*최신 거래일 검증 대기/);
+  await card.locator('summary').click();
+  assert.match(await card.locator('details').innerText(),/2026-10-29 \(ET\)/);
+  assert.match(await card.locator('details').innerText(),/검증 완료 10\.30 09:00 KST/);
+  assert.match(await card.locator('details').innerText(),/최신 거래일 자료 미도착/);
   const sizes=await card.evaluate(n=>['strong','.metric-change','.metric-date'].map(s=>parseFloat(getComputedStyle(n.querySelector(s)).fontSize)));assert(sizes[0]>sizes[1]&&sizes[1]>sizes[2]);assert(await card.locator('strong').evaluate(n=>n.scrollWidth<=n.clientWidth));
-  assert.equal(await p.locator('#market-metrics .metric-pending').count(),3);assert.equal(await p.locator('#market-source-notes .market-source-row').count(),4);
-  for(const message of ['최근 자료 지연','수집 응답 오류','출처 간 수치 불일치'])assert((await p.locator('#market-source-notes').textContent()).includes(message));
+  assert.equal(await p.locator('#market-metrics .metric-pending').count(),3);assert.equal(await p.locator('#market-metrics .market-source-row').count(),4);
+  for(const message of ['최근 자료 지연','수집 응답 오류','출처 간 수치 불일치'])assert((await p.locator('#market-metrics').textContent()).includes(message));
   assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);results.push({width,pendingCards:true,causesPreserved:true,disclosureRefresh:true,mixedQuoteFits:true,section01:true,noOverflow:true});await c.close();
  }
  await browser.close();server.close();console.log(JSON.stringify(results));

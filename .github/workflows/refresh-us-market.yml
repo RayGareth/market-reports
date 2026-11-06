@@ -1,0 +1,39 @@
+name: Refresh public U.S. closing indices
+on:
+  schedule:
+    - cron: '0 23 * * 1-5' # Tuesday-Saturday 08:00 KST
+    - cron: '0 5 * * 2-6' # Tuesday-Saturday 14:00 KST
+    - cron: '0 9 * * 2-6' # Tuesday-Saturday 18:00 KST
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: market-daily-public-us
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install calendar and source adapters
+        run: pip install -r requirements-public.txt
+      - name: Refresh U.S. dashboard only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python scripts/publish_public_study.py --region us
+  deploy:
+    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    needs: refresh
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-study-pages.yml

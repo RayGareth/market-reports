@@ -116,7 +116,7 @@ class PrivateTests(unittest.TestCase):
             html=(Path(tmp)/'reports/daily/2026-10-27.html').read_text()
             self.assertIn('비공개 연결 검증',html)
             self.assertEqual(html.count('SECTION 0'),4)
-            self.assertIn("status==='private_only'",(Path(tmp)/'assets/market.js').read_text())
+            self.assertIn("status === 'private_only'",(Path(tmp)/'assets/market.js').read_text())
         self.assertEqual((root/'assets/market.js').read_bytes(),original)
         doc=builder.make_doc(NOW.date());doc['previewAudience']='private'
         with self.assertRaises(ValueError):builder.generate(doc)
