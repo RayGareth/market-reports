@@ -30,10 +30,10 @@ def publish(repo, attempts=3, before_push=None, build_args=(), region=None):
                                         cwd=work, capture_output=True, text=True)
                 if result.returncode:
                     raise RuntimeError('Public report validation/build failed; no publication')
-                if region == 'us':
-                    git(work, 'add', '--', 'data/public-market.json')
-                else:
-                    git(work, 'add', '--', *OUTPUTS)
+                # U.S. refreshes may also create a dated revision and archive link.
+                outputs = [path for path in OUTPUTS if (work / path).exists()]
+                if outputs:
+                    git(work, 'add', '--', *outputs)
                 if git(work, 'diff', '--cached', '--quiet', check=False).returncode == 0:
                     return head
                 message = 'Refresh public U.S. closes' if region == 'us' else 'Publish public daily study'

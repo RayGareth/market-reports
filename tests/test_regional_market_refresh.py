@@ -256,3 +256,47 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertEqual([row["region"] for row in snapshot["marketStatus"]], ["kr", "kr", "us", "us"])
             self.assertEqual(snapshot["indices"], [])
             self.assertEqual(len(json.loads(git(remote, "show", "main:reports/index.json"))), 1)
+
+    def test_us_publication_commits_revision_and_archive_without_replacing_original(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            remote, repo = base / "remote.git", base / "repo"
+            git(base, "init", "--bare", "--initial-branch=main", str(remote))
+            git(base, "clone", str(remote), str(repo))
+            git(repo, "config", "user.name", "Fixture")
+            git(repo, "config", "user.email", "fixture@example.invalid")
+            build(repo, DAY)
+            (repo / "scripts").mkdir()
+            for name in ("build_public_reports.py", "market_close.py", "market_sources.py", "collect_close.py"):
+                shutil.copy(ROOT / "scripts" / name, repo / "scripts")
+            shutil.copy(ROOT / "scripts/refresh_public_market.py", repo / "scripts/refresh_impl.py")
+            (repo / "scripts/refresh_public_market.py").write_text(
+                "from datetime import datetime\n"
+                "from refresh_impl import ROOT, refresh, collect_region\n"
+                "from market_sources import Bar\n"
+                "class Feed:\n"
+                "    def fetch(self, instrument, target):\n"
+                "        return [Bar('2026-11-03', 100), Bar('2026-11-04', 101)]\n"
+                "now = datetime.fromisoformat('2026-11-04T23:00:00+00:00')\n"
+                "def collect(config, region, existing, now):\n"
+                "    return collect_region(config, region, existing, now, "
+                "{'yahoo': Feed(), 'fred': Feed()}, verified_clock=lambda: now)\n"
+                "refresh(ROOT, 'us', now, collect)\n"
+            )
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            git(repo, "add", ".")
+            git(repo, "commit", "-m", "baseline")
+            git(repo, "push", "origin", "main")
+            original_paths = (f"reports/daily/{DAY}.html", f"content/daily/{DAY}.json")
+            originals = [git(remote, "rev-parse", f"main:{path}") for path in original_paths]
+
+            head = publish(repo, region="us")
+            archive = json.loads(git(remote, "show", "main:reports/index.json"))
+            self.assertEqual([entry["url"] for entry in archive], [f"daily/{DAY}-r001.html"])
+            self.assertIn("101.00", git(remote, "show", f"main:reports/daily/{DAY}-r001.html"))
+            self.assertIn("101.00", git(remote, "show", "main:reports/latest.html"))
+            revision = json.loads(git(remote, "show", f"main:content/daily/{DAY}-r001.json"))
+            self.assertEqual({row["id"] for row in revision["indices"]}, {"sp500", "nasdaq"})
+            self.assertEqual([git(remote, "rev-parse", f"main:{path}") for path in original_paths], originals)
+            self.assertEqual(publish(repo, region="us"), head)
