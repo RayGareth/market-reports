@@ -22,15 +22,17 @@ MORNING = datetime.fromisoformat("2026-11-04T23:00:00+00:00")
 
 
 class Source:
-    def __init__(self, missing=()):
+    def __init__(self, missing=(), day=DAY, previous=PREVIOUS):
         self.calls = []
         self.missing = missing
+        self.day = day
+        self.previous = previous
 
     def fetch(self, instrument, target):
         self.calls.append(instrument)
-        prices = [Bar(PREVIOUS.isoformat(), 100)]
+        prices = [Bar(self.previous.isoformat(), 100)]
         if instrument not in self.missing:
-            prices.append(Bar(DAY.isoformat(), 101))
+            prices.append(Bar(self.day.isoformat(), 101))
         return prices
 
 
@@ -42,6 +44,12 @@ def configuration():
 
 
 def collect(config, region, existing=(), now=MORNING, adapters=None):
+    if region == "kr":
+        target, previous, _ = session_close("XKRX", now, REVIEWED)
+        if adapters is None:
+            adapters = {key: Source(day=target, previous=previous) for key in ("yahoo", "naver")}
+        return collect_region(config, region, existing, now, adapters,
+                              verified_clock=lambda: now + timedelta(seconds=2))
     return collect_region(
         config, region, existing, now,
         adapters if adapters is not None else {key: Source() for key in ("yahoo", "naver", "fred")},
@@ -172,6 +180,48 @@ class RegionalRefreshTests(unittest.TestCase):
                 self.assertEqual(actual_day, day)
                 self.assertEqual(actual_close.isoformat(), close)
 
+    def test_kr_first_publication_waits_for_same_day_verified_close(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(repo, date(2026, 10, 8))
+            archive = repo / "reports/index.json"
+            original_archive = archive.read_bytes()
+            original = repo / "reports/daily/2026-10-08.html"
+            original_html = original.read_bytes()
+            # Friday October 9 is a Korean exchange holiday. On November 4
+            # there is also no settled current close before 16:00 KST.
+            for stamp in ("2026-10-09T09:00:00+00:00",
+                          "2026-11-04T06:29:00+00:00",
+                          "2026-11-04T06:59:00+00:00"):
+                with self.subTest(now=stamp):
+                    refresh(repo, "kr", datetime.fromisoformat(stamp), collect)
+                    self.assertEqual(archive.read_bytes(), original_archive)
+                    self.assertEqual(original.read_bytes(), original_html)
+                    self.assertFalse((repo / "reports/daily/2026-10-09.html").exists())
+                    self.assertFalse((repo / "reports/daily/2026-11-04.html").exists())
+
+            publish_time = datetime.fromisoformat("2026-11-04T09:00:00+00:00")
+            def missing_close(config, region, existing, now):
+                feeds = {"yahoo": Source(), "naver": Source(missing=("kospi", "kosdaq"))}
+                return collect(config, region, existing, now, feeds)
+
+            refresh(repo, "kr", publish_time, missing_close)
+            self.assertEqual(archive.read_bytes(), original_archive)
+            self.assertFalse((repo / "content/daily/2026-11-04.json").exists())
+
+            refresh(repo, "kr", publish_time + timedelta(minutes=15), collect)
+            report = repo / "reports/daily/2026-11-04.html"
+            published = report.read_bytes()
+            self.assertIn(b"101.00", published)
+            self.assertEqual([x["date"] for x in json.loads(archive.read_text())],
+                             ["2026-11-04", "2026-10-08"])
+            refresh(repo, "kr", publish_time + timedelta(minutes=30), collect)
+            self.assertEqual(report.read_bytes(), published)
+            self.assertEqual(original.read_bytes(), original_html)
+            self.assertEqual(list(report.parent.glob("2026-11-04-r*.html")), [])
+
     def test_us_never_creates_report_and_retry_does_not_rewrite_dated_study(self):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
@@ -226,15 +276,21 @@ class RegionalRefreshTests(unittest.TestCase):
             (kr / "scripts/refresh_public_market.py").write_text(
                 "from datetime import datetime\n"
                 "import sys\n"
-                "from refresh_impl import ROOT, refresh\n"
-                "refresh(ROOT, sys.argv[-1], datetime.fromisoformat('2026-11-05T09:00:00+00:00'))\n"
+                "from refresh_impl import ROOT, refresh, collect_region\n"
+                "from market_sources import Bar\n"
+                "class Feed:\n"
+                "    def fetch(self, instrument, target):\n"
+                "        return [Bar('2026-11-04', 100), Bar('2026-11-05', 101)]\n"
+                "def collect(config, region, existing, now):\n"
+                "    return collect_region(config, region, existing, now, "
+                "{'yahoo': Feed(), 'naver': Feed()}, verified_clock=lambda: now)\n"
+                "refresh(ROOT, sys.argv[-1], datetime.fromisoformat('2026-11-05T09:00:00+00:00'), collect)\n"
             )
             (kr / "config").mkdir()
             shutil.copy(ROOT / "config/market-sources.json", kr / "config/market-sources.json")
             # An isolated Git concurrency fixture must never request live prices.
             isolated = json.loads((kr / "config/market-sources.json").read_text())
-            for provider in isolated["providers"].values():
-                provider.update(enabled=False, collectionAllowed=False)
+            isolated["providers"]["fred"].update(enabled=False, collectionAllowed=False)
             (kr / "config/market-sources.json").write_text(json.dumps(isolated))
             git(kr, "add", ".")
             git(kr, "commit", "-m", "baseline")
@@ -254,7 +310,7 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertEqual(git(remote, "rev-list", "--count", "main"), "3")
             snapshot = json.loads(git(remote, "show", "main:data/public-market.json"))
             self.assertEqual([row["region"] for row in snapshot["marketStatus"]], ["kr", "kr", "us", "us"])
-            self.assertEqual(snapshot["indices"], [])
+            self.assertEqual({row["id"] for row in snapshot["indices"]}, {"kospi", "kosdaq"})
             self.assertEqual(len(json.loads(git(remote, "show", "main:reports/index.json"))), 1)
 
     def test_us_publication_commits_revision_and_archive_without_replacing_original(self):

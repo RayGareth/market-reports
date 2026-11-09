@@ -111,14 +111,17 @@ def refresh(root, region, now=None, collect=collect_region):
     doc.update(indices=updated["indices"], distribution=updated["distribution"])
     validate(doc)
 
-    # Leave a dated report as the record of its original publication. Retries
-    # and U.S. checks can update the dashboard without creating revisions.
-    manuscript = root / "content/daily" / f"{day}.json"
+    # The collector uses the exchange calendar and waits for the close to
+    # settle. An earlier session or a pending close cannot start today's note.
     report = root / "reports/daily" / f"{day}.html"
-    built = region == "kr" and day.weekday() < 5 and not report.is_file()
-    if built:
-        build(root, day, market=study_snapshot(updated, config, now))
-        updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
+    built = False
+    if region == "kr" and not report.is_file():
+        market = study_snapshot(updated, config, now)
+        if any(row["region"] == "kr" and row["asOf"] == day.isoformat()
+               for row in market["indices"]):
+            build(root, day, market=market)
+            updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
+            built = True
 
     revisions = 0
     if region == "kr" and not built:
