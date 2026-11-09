@@ -1,0 +1,37 @@
+name: First Market Daily refresh after PR 4
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deploy-market-close-once.yml'
+concurrency:
+  group: market-daily-pr4-first-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-public.txt
+      - name: Refresh verified domestic and U.S. closes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python scripts/publish_public_study.py --region kr
+          python scripts/publish_public_study.py --region us
+  deploy:
+    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    needs: refresh
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-study-pages.yml
