@@ -1,23 +1,62 @@
 {
   "reportDate": "2026-11-06",
-  "indices": [],
+  "indices": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "asOf": "2026-11-06",
+      "previousAsOf": "2026-11-05",
+      "close": 5059.69,
+      "changePct": -6.02,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-06T06:30:00+00:00",
+      "verifiedAt": "2026-11-09T05:16:36.340806+00:00"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "asOf": "2026-11-06",
+      "previousAsOf": "2026-11-05",
+      "close": 644.27,
+      "changePct": -5.03,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-06T06:30:00+00:00",
+      "verifiedAt": "2026-11-09T05:16:37.151256+00:00"
+    }
+  ],
   "distribution": [],
   "marketStatus": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-06T06:30:00+00:00",
       "expectedAsOf": "2026-11-06",
-      "status": "rights_pending",
-      "message": "공개 게시 근거 확인 대기"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-06T06:30:00+00:00",
       "expectedAsOf": "2026-11-06",
-      "status": "rights_pending",
-      "message": "공개 게시 근거 확인 대기"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "sp500",
@@ -36,5 +75,5 @@
       "message": "공개 게시 근거 확인 대기"
     }
   ],
-  "checkedAt": "2026-11-06T10:27:32.187321+00:00"
+  "checkedAt": "2026-11-09T05:16:33.159122+00:00"
 }
