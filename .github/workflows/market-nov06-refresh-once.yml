@@ -1,0 +1,37 @@
+name: Recheck Nov 6 U.S. closes and deploy revised Market Daily
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/market-nov06-refresh-once.yml'
+concurrency:
+  group: market-daily-public-us
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install calendar and source adapters
+        run: pip install -r requirements-public.txt
+      - name: Refresh U.S. closes using the existing publisher
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python scripts/publish_public_study.py --region us
+  deploy:
+    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    needs: refresh
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy-study-pages.yml

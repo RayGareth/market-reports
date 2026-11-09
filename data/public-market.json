@@ -32,6 +32,22 @@
       "verificationSourceName": "네이버 금융",
       "closeAt": "2026-11-06T06:30:00+00:00",
       "verifiedAt": "2026-11-09T05:16:37.151256+00:00"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-06",
+      "previousAsOf": "2026-11-05",
+      "close": 24579.43,
+      "changePct": 1.09,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
+      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
+      "closeAt": "2026-11-06T21:00:00+00:00",
+      "verifiedAt": "2026-11-09T06:11:13.717773+00:00"
     }
   ],
   "distribution": [],
@@ -66,20 +82,20 @@
       "crossCheck": "pending",
       "expectedCloseAt": "2026-11-06T21:00:00+00:00",
       "expectedAsOf": "2026-11-06",
-      "status": "provider_error",
-      "message": "데이터를 확인하지 못했습니다"
+      "status": "missing",
+      "message": "최근 마감 자료가 아직 반영되지 않았습니다"
     },
     {
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-06T21:00:00+00:00",
       "expectedAsOf": "2026-11-06",
-      "status": "provider_error",
-      "message": "데이터를 확인하지 못했습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     }
   ],
-  "checkedAt": "2026-11-09T05:16:38.713328+00:00"
+  "checkedAt": "2026-11-09T06:10:41.944208+00:00"
 }
