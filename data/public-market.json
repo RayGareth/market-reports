@@ -1,37 +1,37 @@
 {
-  "reportDate": "2026-11-06",
+  "reportDate": "2026-11-09",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "asOf": "2026-11-06",
-      "previousAsOf": "2026-11-05",
-      "close": 5059.69,
-      "changePct": -6.02,
+      "asOf": "2026-11-09",
+      "previousAsOf": "2026-11-06",
+      "close": 5018.85,
+      "changePct": -0.81,
       "verified": true,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
       "sourceName": "Yahoo Finance",
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-06T06:30:00+00:00",
-      "verifiedAt": "2026-11-09T05:16:36.340806+00:00"
+      "closeAt": "2026-11-09T06:30:00+00:00",
+      "verifiedAt": "2026-11-09T09:52:19.427780+00:00"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "asOf": "2026-11-06",
-      "previousAsOf": "2026-11-05",
-      "close": 644.27,
-      "changePct": -5.03,
+      "asOf": "2026-11-09",
+      "previousAsOf": "2026-11-06",
+      "close": 638.97,
+      "changePct": -0.82,
       "verified": true,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
       "sourceName": "Yahoo Finance",
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-06T06:30:00+00:00",
-      "verifiedAt": "2026-11-09T05:16:37.151256+00:00"
+      "closeAt": "2026-11-09T06:30:00+00:00",
+      "verifiedAt": "2026-11-09T09:52:20.176608+00:00"
     },
     {
       "id": "nasdaq",
@@ -58,8 +58,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-06T06:30:00+00:00",
-      "expectedAsOf": "2026-11-06",
+      "expectedCloseAt": "2026-11-09T06:30:00+00:00",
+      "expectedAsOf": "2026-11-09",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -69,8 +69,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-06T06:30:00+00:00",
-      "expectedAsOf": "2026-11-06",
+      "expectedCloseAt": "2026-11-09T06:30:00+00:00",
+      "expectedAsOf": "2026-11-09",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -97,5 +97,5 @@
       "message": "확정 종가 · 교차 검증 완료"
     }
   ],
-  "checkedAt": "2026-11-09T06:12:40.325377+00:00"
+  "checkedAt": "2026-11-09T09:52:16.499722+00:00"
 }
