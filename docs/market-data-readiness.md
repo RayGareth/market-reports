@@ -1,5 +1,8 @@
 # 실제 확정 종가 자동 발행 준비 현황
 
+> **2026-10-26 당시의 과거 조사 기록으로 보존한 문서입니다.** 현재 개발 절차나 PR #4의 적용 기준이 아닙니다. 최신 작업 범위·수집 경로·갱신 일정·검증 절차는 [루트 README](../README.md)와 [PR #4](https://github.com/RayGareth/market-reports/pull/4)를 기준으로 확인하세요.
+
+
 검토일: 2026-10-26 KST. 목표는 KOSPI·KOSDAQ을 먼저, 이어 S&P 500·NASDAQ Composite를 매일 자동 수집하여 대시보드와 SECTION 01에 표시하는 것입니다. PR #2는 main 대상 draft이며 병합·배포하지 않았습니다.
 
 ## 완료 / 미완료

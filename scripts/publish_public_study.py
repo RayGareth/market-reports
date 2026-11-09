@@ -13,7 +13,7 @@ def git(repo, *args, check=True):
         raise RuntimeError('Git publication operation failed; no remote overwrite attempted')
     return result
 
-def publish(repo, attempts=3, before_push=None, build_args=()):
+def publish(repo, attempts=3, before_push=None, build_args=(), region=None):
     repo = Path(repo).resolve()
     for attempt in range(attempts):
         git(repo, 'fetch', 'origin', 'main')
@@ -22,13 +22,22 @@ def publish(repo, attempts=3, before_push=None, build_args=()):
             work = Path(tmp) / 'checkout'
             git(repo, 'worktree', 'add', '--detach', str(work), head)
             try:
-                result = subprocess.run([os.environ.get('PYTHON', 'python3'), 'scripts/build_public_reports.py', *build_args], cwd=work, capture_output=True, text=True)
+                if region:
+                    command = ['scripts/refresh_public_market.py', '--region', region]
+                else:
+                    command = ['scripts/build_public_reports.py', *build_args]
+                result = subprocess.run([os.environ.get('PYTHON', 'python3'), *command],
+                                        cwd=work, capture_output=True, text=True)
                 if result.returncode:
                     raise RuntimeError('Public report validation/build failed; no publication')
-                git(work, 'add', '--', *OUTPUTS)
+                # U.S. refreshes may also create a dated revision and archive link.
+                outputs = [path for path in OUTPUTS if (work / path).exists()]
+                if outputs:
+                    git(work, 'add', '--', *outputs)
                 if git(work, 'diff', '--cached', '--quiet', check=False).returncode == 0:
                     return head
-                git(work, 'commit', '-m', 'Publish public daily study')
+                message = 'Refresh public U.S. closes' if region == 'us' else 'Publish public daily study'
+                git(work, 'commit', '-m', message)
                 if before_push:
                     before_push(attempt)
                 # Fast-forward only. On a race, discard this worktree and rebuild on current main.
@@ -41,4 +50,8 @@ def publish(repo, attempts=3, before_push=None, build_args=()):
 if __name__ == '__main__':
     if os.environ.get('GITHUB_ACTIONS') != 'true':
         raise SystemExit('Run through the publication workflow; no local checkout is modified')
-    print('Published public revision:', publish(Path(__file__).resolve().parents[1], build_args=('--market',)))
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--region', required=True, choices=('kr', 'us'))
+    print('Published public revision:', publish(Path(__file__).resolve().parents[1],
+                                               region=parser.parse_args().region))
