@@ -82,8 +82,8 @@
       "crossCheck": "pending",
       "expectedCloseAt": "2026-11-06T21:00:00+00:00",
       "expectedAsOf": "2026-11-06",
-      "status": "missing",
-      "message": "최근 마감 자료가 아직 반영되지 않았습니다"
+      "status": "provider_error",
+      "message": "데이터를 확인하지 못했습니다"
     },
     {
       "id": "nasdaq",
@@ -97,5 +97,5 @@
       "message": "확정 종가 · 교차 검증 완료"
     }
   ],
-  "checkedAt": "2026-11-09T06:10:41.944208+00:00"
+  "checkedAt": "2026-11-09T06:12:40.325377+00:00"
 }
