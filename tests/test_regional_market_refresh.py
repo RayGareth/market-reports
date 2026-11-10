@@ -134,18 +134,36 @@ class RegionalRefreshTests(unittest.TestCase):
         cfg = configuration()
         adapters = {"yahoo": Source(), "fred": Source(missing=("nasdaq",))}
         morning = collect(cfg, "us", adapters=adapters)
-        self.assertEqual([row["id"] for row in morning["indices"]], ["sp500"])
+        self.assertEqual([row["id"] for row in morning["indices"]], ["sp500", "nasdaq"])
         self.assertEqual(morning["indices"][0]["closeAt"], CLOSE.isoformat())
         self.assertEqual(morning["indices"][0]["verifiedAt"], (MORNING + timedelta(seconds=2)).isoformat())
         self.assertEqual(morning["indices"][0]["changePct"], 1.0)
         self.assertEqual(morning["marketStatus"][1]["collection"], "partial")
         self.assertEqual(morning["marketStatus"][1]["crossCheck"], "pending")
+        pending = morning["indices"][1]
+        self.assertFalse(pending["verified"])
+        self.assertEqual(pending["verificationStatus"], "pending")
+        self.assertEqual(pending["previousAsOf"], PREVIOUS.isoformat())
+        self.assertEqual(pending["collectedAt"], (MORNING + timedelta(seconds=2)).isoformat())
+        self.assertNotIn("verificationSource", pending)
+        doc = make_doc(DAY)
+        for changes in ({"region": "kr"}, {"collectedAt": "2026-11-04T20:00:00Z"},
+                        {"collectedAt": "2026-11-04T23:00:00"},
+                        {"verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM"},
+                        {"publication": {"status": "private_only"}}):
+            with self.subTest(changes=changes):
+                doc["indices"] = [{**pending, **changes}]
+                with self.assertRaises(ValueError):
+                    generate(doc)
 
         adapters = {"yahoo": Source(), "fred": Source()}
         afternoon = collect(cfg, "us", morning["indices"], MORNING + timedelta(hours=6), adapters)
         self.assertEqual(adapters["fred"].calls, ["nasdaq"])
         self.assertEqual(adapters["yahoo"].calls, ["nasdaq"])
         self.assertEqual(afternoon["indices"][0], morning["indices"][0])
+        self.assertTrue(afternoon["indices"][1]["verified"])
+        self.assertEqual(afternoon["indices"][1]["collectedAt"], pending["collectedAt"])
+        self.assertEqual(afternoon["marketStatus"][1]["crossCheck"], "passed")
 
         adapters = {"yahoo": Source(), "fred": Source()}
         evening = collect(cfg, "us", afternoon["indices"], MORNING + timedelta(hours=10), adapters)
@@ -158,7 +176,7 @@ class RegionalRefreshTests(unittest.TestCase):
         old = collect(cfg, "us")["indices"][0]
         old.update(asOf=PREVIOUS.isoformat(), closeAt="2026-11-03T21:00:00+00:00",
                    verifiedAt="2026-11-03T23:01:00+00:00")
-        adapters = {"yahoo": Source(), "fred": Source(missing=("sp500", "nasdaq"))}
+        adapters = {"yahoo": Source(missing=("sp500", "nasdaq")), "fred": Source()}
         result = collect(cfg, "us", [old], adapters=adapters)
         self.assertEqual(result["indices"], [old])
         self.assertEqual(result["marketStatus"][0]["expectedAsOf"], DAY.isoformat())
@@ -166,6 +184,126 @@ class RegionalRefreshTests(unittest.TestCase):
         cfg["providers"]["fred"]["enabled"] = False
         result = collect(cfg, "us", [old], adapters=adapters)
         self.assertEqual(result["indices"], [])
+
+    def test_us_provisional_requires_valid_yahoo_and_a_transient_comparison_failure(self):
+        class Reply:
+            def __init__(self, bars=None):
+                self.bars = bars
+
+            def fetch(self, instrument, target):
+                if self.bars is None:
+                    raise TimeoutError("DO_NOT_PUBLISH_THIS")
+                return self.bars
+
+        cfg = configuration()
+        valid = [Bar(PREVIOUS.isoformat(), 100), Bar(DAY.isoformat(), 101)]
+        delayed = collect(cfg, "us", adapters={"yahoo": Reply(valid), "fred": Reply()})
+        self.assertTrue(all(state["status"] == "single_source" for state in delayed["marketStatus"]))
+        self.assertTrue(all(state["verificationReason"] == "provider_error" for state in delayed["marketStatus"]))
+        self.assertNotIn("DO_NOT_PUBLISH_THIS", json.dumps(delayed))
+        retry = collect(cfg, "us", delayed["indices"], adapters={"yahoo": Reply(), "fred": Reply(valid)})
+        self.assertEqual(retry["indices"], delayed["indices"])
+        for bars in (valid[1:], [*valid, valid[1]], [valid[0], Bar(DAY.isoformat(), 0)],
+                     [valid[0], Bar(DAY.isoformat(), 101, 9.5)],
+                     [valid[0], Bar("2026-11-05", 101)]):
+            with self.subTest(bars=bars):
+                self.assertEqual(collect(cfg, "us", adapters={"yahoo": Reply(bars), "fred": Reply()})["indices"], [])
+        for fred in ([valid[0], Bar(DAY.isoformat(), 103)],
+                     [Bar(PREVIOUS.isoformat(), 97), valid[1]]):
+            result = collect(cfg, "us", adapters={"yahoo": Reply(valid), "fred": Reply(fred)})
+            self.assertEqual(result["indices"], [])
+            self.assertTrue(all(state["crossCheck"] == "failed" for state in result["marketStatus"]))
+        result = collect(cfg, "us", adapters={"yahoo": Reply(valid), "fred": Reply([valid[0], Bar(DAY.isoformat(), 0)])})
+        self.assertTrue(all(row["verificationStatus"] == "pending" for row in result["indices"]))
+        self.assertTrue(all(state["verificationReason"] == "invalid" for state in result["marketStatus"]))
+
+    def test_us_disagreement_withdraws_provisional_and_recovers_without_duplicate_editions(self):
+        class Different(Source):
+            def fetch(self, instrument, target):
+                return [Bar(PREVIOUS.isoformat(), 100), Bar(DAY.isoformat(), 103)]
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            (root / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(root, DAY)
+            originals = {p: p.read_bytes() for p in (
+                root / f"reports/daily/{DAY}.html", root / f"content/daily/{DAY}.json"
+            )}
+            build(root, DAY + timedelta(days=1))
+            latest = (root / "reports/latest.html").read_bytes()
+            dashboard = root / "data/public-market.json"
+            seed = json.loads(dashboard.read_text())
+            retained = collect(configuration(), "us")["indices"][0]
+            retained.update(asOf=PREVIOUS.isoformat(), previousAsOf="2026-11-02",
+                            closeAt="2026-11-03T21:00:00+00:00", collectedAt="2026-11-03T23:00:00+00:00",
+                            verifiedAt="2026-11-03T23:01:00+00:00")
+            seed["indices"] = [retained]
+            dashboard.write_text(json.dumps(seed))
+
+            def run(fred, offset):
+                def feed(config, region, existing, now):
+                    return collect(config, region, existing, now, {"yahoo": Source(), "fred": fred})
+                refresh(root, "us", MORNING + timedelta(hours=offset), feed)
+                return json.loads(dashboard.read_text())
+
+            pending = run(Source(missing=("sp500", "nasdaq")), 0)
+            self.assertEqual(pending["lastVerifiedUs"], [retained])
+            first = root / f"reports/daily/{DAY}-r001.html"
+            pending_page = first.read_bytes()
+            self.assertIn("교차 검증 전", pending_page.decode())
+            self.assertNotIn("FRED", pending_page.decode())
+            run(Source(missing=("sp500", "nasdaq")), 1)
+            self.assertEqual(len(list(first.parent.glob(f"{DAY}-r*.html"))), 1)
+
+            conflict = run(Different(), 2)
+            self.assertEqual(conflict["indices"], [retained])
+            self.assertEqual(conflict["marketStatus"][0]["status"], "disagreement")
+            second = first.with_name(f"{DAY}-r002.html")
+            self.assertIn("재검토 중", second.read_text())
+            self.assertNotIn("101.00", second.read_text())
+            self.assertEqual(run(Source(missing=("sp500", "nasdaq")), 3)["indices"], [retained])
+            self.assertEqual(len(list(first.parent.glob(f"{DAY}-r*.html"))), 2)
+
+            resolved = run(Source(), 4)
+            self.assertTrue(all(row["verified"] for row in resolved["indices"]))
+            third = first.with_name(f"{DAY}-r003.html")
+            self.assertIn("교차 검증 완료", third.read_text())
+            self.assertEqual(first.read_bytes(), pending_page)
+            self.assertTrue(all(path.read_bytes() == before for path, before in originals.items()))
+            self.assertEqual((root / "reports/latest.html").read_bytes(), latest)
+            archive = json.loads((root / "reports/index.json").read_text())
+            self.assertEqual(archive[1]["url"], f"daily/{DAY}-r003.html")
+            run(Source(), 5)
+            self.assertEqual(len(list(first.parent.glob(f"{DAY}-r*.html"))), 3)
+
+    def test_late_comparison_revises_older_session_without_replacing_latest_snapshot(self):
+        class Feed:
+            def __init__(self, missing=False):
+                self.missing = missing
+
+            def fetch(self, instrument, target):
+                return [Bar((target - timedelta(days=1)).isoformat(), 100)] + (
+                    [] if self.missing else [Bar(target.isoformat(), 101)]
+                )
+
+        def feed(config, region, existing, now):
+            return collect_region(config, region, existing, now,
+                                  {"yahoo": Feed(), "fred": Feed(missing=now == MORNING)},
+                                  verified_clock=lambda: now + timedelta(seconds=2))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            (root / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(root, DAY)
+            refresh(root, "us", MORNING, feed)
+            new_day = DAY + timedelta(days=1)
+            refresh(root, "us", MORNING + timedelta(days=1), feed)
+            old_doc = json.loads((root / f"content/daily/{DAY}-r002.json").read_text())
+            self.assertTrue(all(row["verified"] for row in old_doc["indices"]))
+            snapshot = json.loads((root / "data/public-market.json").read_text())
+            self.assertEqual({row["asOf"] for row in snapshot["indices"]}, {new_day.isoformat()})
 
     def test_real_exchange_calendar_close_metadata_including_holiday_dst_and_early_close(self):
         cases = [

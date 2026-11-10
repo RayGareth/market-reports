@@ -32,6 +32,7 @@ MESSAGES = {
     'latest_pending':'최신 거래일 검증 대기',
     'single_source':'확정 종가 · 단일 출처 검증 · 교차 검증 대기',
 }
+PUBLIC_US_PENDING = '교차 검증 전'
 
 def session_close(calendar_name, now, reviewed_through):
     import exchange_calendars as xc
@@ -120,7 +121,8 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
     now = now or datetime.now(timezone.utc)
     adapters = adapters if adapters is not None else ADAPTERS
     indices, statuses = [], []
-    existing = {row["id"]: row for row in existing}
+    provisional = {row["id"]: row for row in existing if row.get("verificationStatus") == "pending"}
+    existing = {row["id"]: row for row in existing if row.get("verified") is True}
     for instrument, meta in INSTRUMENTS.items():
         if region and meta["region"] != region:
             continue
@@ -160,11 +162,14 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 # A changed exchange close time invalidates the cached session metadata.
                 retained = None
         good, errors = {}, []
+        collected_at = None
         for name, policy in config['providers'].items():
             if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []) or (audience == 'private' and not private_allowed(policy, instrument, now.date())):
                 continue
             try:
                 good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
+                if region == 'us' and name == 'yahoo':
+                    collected_at = verified_clock().isoformat()
             except LookupError:
                 errors.append('missing')
             except ValueError:
@@ -172,14 +177,25 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             except Exception:
                 errors.append('provider_error')
         failure = errors[0] if errors else 'missing'
+        pending = None
         for primary, policy in candidates:
             if primary not in good:
                 continue
             a, prev_a, pct_a = good[primary]
+            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary)}
+            if region == 'us':
+                row.update(closeAt=state['expectedCloseAt'], collectedAt=collected_at)
+                cached = provisional.get(instrument, {})
+                if cached.get('collectedAt') and all(cached.get(key) == row[key] for key in (
+                    'asOf', 'previousAsOf', 'closeAt', 'close', 'changePct', 'source'
+                )):
+                    row['collectedAt'] = cached['collectedAt']
             checkers = [(name, config['providers'][name]) for name in good if name != primary and config['providers'][name].get('family') != policy.get('family')]
             if not checkers:
                 if not errors:
                     failure = 'verification_unavailable'
+                if region == 'us' and failure in ('missing', 'provider_error', 'invalid'):
+                    pending = dict(row, verified=False, validated=True, verificationStatus='pending')
                 continue
             try:
                 for other, other_policy in checkers:
@@ -192,7 +208,9 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             except ValueError:
                 failure = 'disagreement'
                 break  # Do not shop for an agreeing pair after a valid source disagrees.
-            row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'verified':True, 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary), 'verificationSource':checkers[0][1]['sourceUrls'][instrument], 'verificationSourceName':checkers[0][1].get('label', checkers[0][0])}
+            other, other_policy = checkers[0]
+            row.update(verified=True, verificationSource=other_policy['sourceUrls'][instrument],
+                       verificationSourceName=other_policy.get('label', other))
             if region:
                 row.update(closeAt=state["expectedCloseAt"], verifiedAt=verified_clock().isoformat())
             if audience == 'private':
@@ -219,13 +237,24 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
         if state.get('status') not in ('verified', 'single_source'):
             state['status'] = failure
         state['message'] = MESSAGES[state['status']]
+        if region == 'us':
+            if pending is None and 'yahoo' not in good and failure in ('missing', 'provider_error') and 'invalid' not in errors:
+                cached = provisional.get(instrument, {})
+                if (cached.get('asOf') == target.isoformat() and cached.get('previousAsOf') == previous.isoformat()
+                        and cached.get('closeAt') == state['expectedCloseAt']
+                        and cached.get('source') == config['providers']['yahoo']['sourceUrls'][instrument]):
+                    pending = cached
+            if pending is not None:
+                indices.append(pending)
+                state.update(status='single_source', message=PUBLIC_US_PENDING,
+                             verificationReason=failure)
         if region:
             state.update(
                 collection="complete" if len(good) == 2 else ("partial" if good else "unavailable"),
                 crossCheck="passed" if state["status"] == "verified" else
                 ("failed" if state["status"] == "disagreement" else "pending"),
             )
-            if retained and state["status"] != "verified":
+            if retained and state["status"] not in ("verified", "single_source"):
                 indices.append(retained)
                 state["message"] = MESSAGES["latest_pending"] + " · " + state["message"]
         statuses.append(state)

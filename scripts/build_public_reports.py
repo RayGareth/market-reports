@@ -47,9 +47,27 @@ def approved(item, audience='public'):
             and access.get('status') == 'private_only'
             and https(access.get('evidence')) and https(item.get('source'))
         )
-    # Only independently verified, source-attributed rows enter the public study.
     return (item.get('verified') is True and https(item.get('source'))
             and item.get('publication', {}).get('status') != 'private_only')
+
+def pending_us_close(item):
+    """Only settled Yahoo U.S. index observations may appear before comparison."""
+    instrument = {'sp500': ('S&P 500', 'GSPC'), 'nasdaq': ('NASDAQ', 'IXIC')}.get(item.get('id'))
+    if (not instrument or item.get('name') != instrument[0] or item.get('region') != 'us'
+            or item.get('verified') is not False or item.get('validated') is not True
+            or item.get('verificationStatus') != 'pending'
+            or item.get('publication', {}).get('status') == 'private_only'
+            or item.get('source') != f'https://finance.yahoo.com/quote/%5E{instrument[1]}/history/'
+            or any(item.get(key) for key in ('verificationSource', 'verificationSourceName', 'verifiedAt'))):
+        return False
+    try:
+        close = datetime.fromisoformat(item['closeAt'].replace('Z', '+00:00'))
+        collected = datetime.fromisoformat(item['collectedAt'].replace('Z', '+00:00'))
+        return (close.tzinfo is not None and collected.tzinfo is not None and collected >= close
+                and close.astimezone(ZoneInfo('America/New_York')).date().isoformat() == item['asOf']
+                and date.fromisoformat(item['previousAsOf']) < date.fromisoformat(item['asOf']))
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return False
 
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
@@ -63,7 +81,7 @@ def validate(doc, audience='public'):
     if not 0 <= lesson['answer'] < len(lesson['options']):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
-        if not approved(item, audience):
+        if not approved(item, audience) and not (audience == 'public' and pending_us_close(item)):
             raise ValueError('Unverified or unattributed market row: refusing to render')
         date.fromisoformat(item['asOf'])
         if item.get('verificationSource') and not https(item['verificationSource']):
@@ -129,12 +147,18 @@ def generate(doc, audience='public'):
             overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'
     pending = [row['name'] for row in doc.get('indices', []) if not row.get('verified')]
     if pending:
-        overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · 단일 출처 검증 · 교차 검증 대기</p>'
+        label = '교차 검증 전' if audience == 'public' else '단일 출처 검증 · 교차 검증 대기'
+        overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · ' + label + '</p>'
+    for state in doc.get('marketStatus', []):
+        if audience == 'public' and state['region'] == 'us' and state['status'] == 'disagreement':
+            overview += '<p class="market-validation-summary">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · 재검토 중</p>'
     if doc.get('indices'):
         overview += '<details class="market-source-notes"><summary>출처·검증 정보</summary>'
         notices = set()
         for row in doc['indices']:
-            verification = '교차 검증 완료' if row.get('verified') is True else '단일 출처 · 비교 대기'
+            verification = '교차 검증 완료' if row.get('verified') is True else (
+                '교차 검증 전' if audience == 'public' else '단일 출처 · 비교 대기'
+            )
             overview += '<div class="market-source-row"><b>' + esc(row['name']) + '</b><span>' + verification
             if row.get('previousAsOf'):
                 overview += ' · ' + esc(row['previousAsOf']) + ' 종가 대비'
@@ -142,12 +166,15 @@ def generate(doc, audience='public'):
             close_label = market_close_label(row.get('closeAt'))
             if close_label:
                 overview += '<span>마감 ' + esc(close_label) + '</span>'
-            if row.get('verifiedAt'):
+            collected_label = market_close_label(row.get('collectedAt'))
+            if collected_label:
+                overview += '<span>수집 ' + esc(collected_label) + '</span>'
+            if row.get('verified') is True and row.get('verifiedAt'):
                 verified_label = market_close_label(row['verifiedAt'])
                 if verified_label:
                     overview += '<span>검증 완료 ' + esc(verified_label) + '</span>'
             overview += '<a href="' + esc(row['source']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('sourceName', '원문')) + ' ↗</a>'
-            if row.get('verificationSource'):
+            if row.get('verificationSource') and row.get('verified') is True:
                 overview += '<a href="' + esc(row['verificationSource']) + '" target="_blank" rel="noopener noreferrer">' + esc(row.get('verificationSourceName', '비교 출처')) + ' ↗</a>'
             overview += '</div>'
             for key in ('copyrightNotice', 'verificationCopyrightNotice'):
@@ -204,7 +231,7 @@ def build(root, day, backfill=False, market=None):
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
-        validate(enriched)  # Keep unverified observations out of the manuscript.
+        validate(enriched)
         if original_target.exists() or manuscript.exists():
             if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
                 enriched['revision'] = int(current.get('revision', 0)) + 1

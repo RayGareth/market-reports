@@ -2,7 +2,7 @@
 """Update one regional dashboard snapshot, optionally creating the daily study."""
 import argparse
 import json
-from datetime import date, datetime, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -14,6 +14,8 @@ except ImportError:
     from market_close import INSTRUMENTS, MESSAGES, collect_region, session_close
 
 ROOT = Path(__file__).resolve().parents[1]
+DISPLAY_STATES = {"verified", "single_source"}
+REVISION_WINDOW = 7
 
 
 def study_snapshot(snapshot, config, now):
@@ -40,56 +42,117 @@ def study_snapshot(snapshot, config, now):
                                  collection="not_attempted", crossCheck="not_attempted", publication="pending")
                 state.update(expectedAsOf=expected, expectedCloseAt=close.isoformat())
         states.append(state)
-    targets = {state["id"]: state.get("expectedAsOf") for state in states if state["status"] == "verified"}
+    targets = {state["id"]: state.get("expectedAsOf") for state in states if state["status"] in DISPLAY_STATES}
     return {
         "indices": [row for row in snapshot["indices"] if targets.get(row["id"]) == row["asOf"]],
         "marketStatus": states,
     }
 
 
-def revise_dated_study(root, session_day, region, result):
-    """Append a dated revision for newly verified closes, preserving the original."""
+def dated_study(root, session_day):
     report = root / "reports/daily" / f"{session_day}.html"
     manuscript = root / "content/daily" / f"{session_day}.json"
     if not report.is_file() or not manuscript.is_file():
-        return False
-
+        return None
     variants = sorted((root / "content/daily").glob(f"{session_day}-r*.json"))
-    current = json.loads((variants[-1] if variants else manuscript).read_text())
-    verified_ids = {
-        state["id"] for state in result["marketStatus"]
-        if state["status"] == "verified"
+    return json.loads((variants[-1] if variants else manuscript).read_text())
+
+
+def revise_dated_study(root, session_day, region, result):
+    """Append changed closes or a review notice, preserving all previous editions."""
+    current = dated_study(root, session_day)
+    if current is None:
+        return False
+    target = session_day.isoformat()
+    affected = {
+        state["id"]: state for state in result["marketStatus"]
+        if state["region"] == region and state.get("expectedAsOf") == target
+        and (state["status"] in DISPLAY_STATES
+             or (region == "us" and state["status"] == "disagreement"))
     }
     candidates = {
         row["id"]: row for row in result["indices"]
-        if row["region"] == region and row["asOf"] == session_day.isoformat()
-        and row.get("verified") is True and row["id"] in verified_ids
+        if row["region"] == region and row["asOf"] == target and row["id"] in affected
+        and affected[row["id"]]["status"] in DISPLAY_STATES
     }
-    if not candidates:
-        return False
-
-    # A later confirmation of the same close must not create another revision.
     merged = {row["id"]: row for row in current.get("indices", [])}
-    meaningful = ("id", "asOf", "previousAsOf", "close", "changePct",
-                  "closeAt", "source", "verificationSource")
-    if not any(
-        key not in merged
-        or any(merged[key].get(field) != row.get(field) for field in meaningful)
-        for key, row in candidates.items()
-    ):
+    status_by_id = {state["id"]: state for state in current.get("marketStatus", [])}
+    meaningful = ("asOf", "previousAsOf", "close", "changePct", "closeAt",
+                  "source", "verificationSource", "verified", "verificationStatus")
+    changed = False
+    for key, state in affected.items():
+        before, after = merged.get(key, {}), candidates.get(key)
+        if before.get("verified") is True and before["asOf"] == target and (
+            after is None or after.get("verified") is not True
+        ):
+            continue
+        prior_status = status_by_id.get(key, {})
+        if state["status"] == "disagreement":
+            if before.get("verificationStatus") == "pending" and before["asOf"] == target:
+                del merged[key]
+            elif prior_status.get("status") == "disagreement" and prior_status.get("expectedAsOf") == target:
+                continue
+        elif after is None or all(before.get(field) == after.get(field) for field in meaningful):
+            continue
+        else:
+            merged[key] = after
+        status_by_id[key] = state
+        changed = True
+    if not changed:
         return False
 
-    merged.update(candidates)
     order = list(INSTRUMENTS)
     rows = sorted(merged.values(), key=lambda row: order.index(row["id"]))
-    status_by_id = {state["id"]: state for state in current.get("marketStatus", [])}
-    status_by_id.update({
-        state["id"]: state for state in result["marketStatus"]
-        if state["id"] in candidates
-    })
     states = sorted(status_by_id.values(), key=lambda state: order.index(state["id"]))
     build(root, session_day, market={"indices": rows, "marketStatus": states})
     return True
+
+
+def preserve_us_reviews(result, previous, verified):
+    """A transient source failure cannot republish an already disputed quote."""
+    reviews = {
+        (state["id"], state.get("expectedAsOf")): state
+        for state in previous if state["status"] == "disagreement"
+    }
+    for index, state in enumerate(result["marketStatus"]):
+        key = state["id"]
+        review = reviews.get((key, state.get("expectedAsOf")))
+        if review is None or state["status"] in ("verified", "disagreement"):
+            continue
+        result["marketStatus"][index] = review
+        result["indices"] = [row for row in result["indices"] if row["id"] != key]
+        if key in verified:
+            result["indices"].append(verified[key])
+
+
+def retry_dated_us_study(root, day, config, current, collect):
+    """Retry one older unfinished report per slot, separately from the dashboard."""
+    latest = {state.get("expectedAsOf") for state in current["marketStatus"]}
+    for days_ago in range(REVISION_WINDOW, 0, -1):
+        session = day - timedelta(days=days_ago)
+        target = session.isoformat()
+        if target in latest:
+            continue
+        study = dated_study(root, session)
+        if study is None:
+            continue
+        unfinished = {
+            state["id"] for state in study.get("marketStatus", [])
+            if state["region"] == "us" and state.get("expectedAsOf") == target
+            and state["status"] in ("single_source", "disagreement")
+        }
+        if not unfinished:
+            continue
+        scoped = {**config, "providers": {
+            name: {**policy, "instruments": [key for key in policy.get("instruments", []) if key in unfinished]}
+            for name, policy in config["providers"].items()
+        }}
+        # The existing calendar still selects and validates both sessions.
+        cutoff = datetime.combine(session, time(23, 59), timezone.utc)
+        result = collect(scoped, "us", existing=study.get("indices", []), now=cutoff)
+        preserve_us_reviews(result, study.get("marketStatus", []), {})
+        return int(revise_dated_study(root, session, "us", result))
+    return 0
 
 
 def refresh(root, region, now=None, collect=collect_region):
@@ -98,17 +161,32 @@ def refresh(root, region, now=None, collect=collect_region):
     path = root / "data/public-market.json"
     snapshot = json.loads(path.read_text()) if path.is_file() else {}
     config = json.loads((root / "config/market-sources.json").read_text())
-    result = collect(config, region, existing=snapshot.get("indices", []), now=now)
+    existing = snapshot.get("indices", [])
+    verified_us = {row["id"]: row for row in snapshot.get("lastVerifiedUs", []) + existing
+                   if row["region"] == "us" and row.get("verified") is True}
+    if region == "us":
+        result = collect(config, region, existing=[*verified_us.values(), *existing], now=now)
+        preserve_us_reviews(result, snapshot.get("marketStatus", []), verified_us)
+    else:
+        result = collect(config, region, existing=existing, now=now)
     updated = dict(snapshot)
     for field in ("indices", "marketStatus"):
         untouched = [row for row in snapshot.get(field, []) if row["region"] != region]
         order = list(INSTRUMENTS)
         updated[field] = sorted(untouched + result[field], key=lambda row: order.index(row["id"]))
+    if region == "us":
+        fallback = [verified_us[row["id"]] for row in updated["indices"]
+                    if row.get("verificationStatus") == "pending" and row["id"] in verified_us]
+        if fallback:
+            updated["lastVerifiedUs"] = fallback
+        else:
+            updated.pop("lastVerifiedUs", None)
 
     updated.setdefault("distribution", [])
-    # Validate the verified snapshot shape before writing the dashboard.
+    # Validate public observations, including retained fallbacks, before writing.
     doc = make_doc(day)
-    doc.update(indices=updated["indices"], distribution=updated["distribution"])
+    doc.update(indices=updated["indices"] + updated.get("lastVerifiedUs", []),
+               distribution=updated["distribution"])
     validate(doc)
 
     # The collector uses the exchange calendar and waits for the close to
@@ -128,15 +206,12 @@ def refresh(root, region, now=None, collect=collect_region):
         revisions += int(revise_dated_study(root, day, region, result))
     if region == "us":
         # U.S. trading date is one day earlier in KST, or older after holidays.
-        sessions = {
-            date.fromisoformat(row["asOf"]) for row in result["indices"]
-            if row["region"] == "us" and row.get("verified") is True
-            and any(state["id"] == row["id"] and state["status"] == "verified"
-                    for state in result["marketStatus"])
-        }
+        sessions = {date.fromisoformat(state["expectedAsOf"]) for state in result["marketStatus"]
+                    if state["status"] in DISPLAY_STATES | {"disagreement"} and state.get("expectedAsOf")}
         for session_day in sorted(sessions):
-            if 0 <= (day - session_day).days <= 7:
+            if 0 <= (day - session_day).days <= REVISION_WINDOW:
                 revisions += int(revise_dated_study(root, session_day, region, result))
+        revisions += retry_dated_us_study(root, day, config, result, collect)
 
     # build() regenerates a dated archive alias; the dashboard remains the
     # independent latest-by-region snapshot, never the dated study's snapshot.
