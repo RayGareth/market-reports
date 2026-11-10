@@ -80,8 +80,8 @@
       "region": "us",
       "collection": "partial",
       "crossCheck": "pending",
-      "expectedCloseAt": "2026-11-06T21:00:00+00:00",
-      "expectedAsOf": "2026-11-06",
+      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
+      "expectedAsOf": "2026-11-09",
       "status": "provider_error",
       "message": "데이터를 확인하지 못했습니다"
     },
@@ -89,13 +89,13 @@
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "collection": "complete",
-      "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-06T21:00:00+00:00",
-      "expectedAsOf": "2026-11-06",
-      "status": "verified",
-      "message": "확정 종가 · 교차 검증 완료"
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
+      "expectedAsOf": "2026-11-09",
+      "status": "provider_error",
+      "message": "최신 거래일 검증 대기 · 데이터를 확인하지 못했습니다"
     }
   ],
-  "checkedAt": "2026-11-09T09:52:16.499722+00:00"
+  "checkedAt": "2026-11-10T04:26:32.886169+00:00"
 }
