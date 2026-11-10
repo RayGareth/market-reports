@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-11-10",
+  "publication": "original_study",
+  "edition": "daily-study",
+  "headline": "2026-11-10 · 분산 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 5239.13,
+      "changePct": 4.39,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-10T06:30:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:19.122551+00:00"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 667.61,
+      "changePct": 4.48,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-10T06:30:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:22.485431+00:00"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-09",
+      "previousAsOf": "2026-11-06",
+      "close": 25253.14,
+      "changePct": 2.74,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
+      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
+      "closeAt": "2026-11-09T21:00:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:13.294985+00:00"
+    }
+  ],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "분산",
+    "explanation": "여러 대상에 나누면 한 대상의 변화에만 결과가 좌우되는 정도를 줄일 수 있습니다. 손실 가능성이 없어지는 것은 아닙니다.",
+    "example": "이름이 다른 펀드라도 담고 있는 기업이 비슷할 수 있습니다. 이름보다 구성 내용을 살펴보면 분산의 의미가 더 잘 보입니다.",
+    "question": "분산에 대한 설명 중 알맞은 것은?",
+    "options": [
+      "손실을 완전히 없앤다",
+      "특정 대상에 대한 집중을 줄인다",
+      "상품 이름만 다르면 충분하다"
+    ],
+    "answer": 1,
+    "why": "분산은 집중을 줄이는 방법이며 손실을 없애는 보장은 아닙니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  },
+  "marketStatus": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-10T06:30:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-10T06:30:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
+      "expectedAsOf": "2026-11-09",
+      "status": "provider_error",
+      "message": "데이터를 확인하지 못했습니다"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
+      "expectedAsOf": "2026-11-09",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    }
+  ]
+}

@@ -1,53 +1,53 @@
 {
-  "reportDate": "2026-11-09",
+  "reportDate": "2026-11-10",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "asOf": "2026-11-09",
-      "previousAsOf": "2026-11-06",
-      "close": 5018.85,
-      "changePct": -0.81,
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 5239.13,
+      "changePct": 4.39,
       "verified": true,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
       "sourceName": "Yahoo Finance",
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-09T06:30:00+00:00",
-      "verifiedAt": "2026-11-09T09:52:19.427780+00:00"
+      "closeAt": "2026-11-10T06:30:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:19.122551+00:00"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "asOf": "2026-11-09",
-      "previousAsOf": "2026-11-06",
-      "close": 638.97,
-      "changePct": -0.82,
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 667.61,
+      "changePct": 4.48,
       "verified": true,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
       "sourceName": "Yahoo Finance",
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-09T06:30:00+00:00",
-      "verifiedAt": "2026-11-09T09:52:20.176608+00:00"
+      "closeAt": "2026-11-10T06:30:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:22.485431+00:00"
     },
     {
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "asOf": "2026-11-06",
-      "previousAsOf": "2026-11-05",
-      "close": 24579.43,
-      "changePct": 1.09,
+      "asOf": "2026-11-09",
+      "previousAsOf": "2026-11-06",
+      "close": 25253.14,
+      "changePct": 2.74,
       "verified": true,
       "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
       "sourceName": "Yahoo Finance",
       "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
       "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
-      "closeAt": "2026-11-06T21:00:00+00:00",
-      "verifiedAt": "2026-11-09T06:11:13.717773+00:00"
+      "closeAt": "2026-11-09T21:00:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:13.294985+00:00"
     }
   ],
   "distribution": [],
@@ -58,8 +58,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-09T06:30:00+00:00",
-      "expectedAsOf": "2026-11-09",
+      "expectedCloseAt": "2026-11-10T06:30:00+00:00",
+      "expectedAsOf": "2026-11-10",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -69,8 +69,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-09T06:30:00+00:00",
-      "expectedAsOf": "2026-11-09",
+      "expectedCloseAt": "2026-11-10T06:30:00+00:00",
+      "expectedAsOf": "2026-11-10",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -89,13 +89,13 @@
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-09T21:00:00+00:00",
       "expectedAsOf": "2026-11-09",
-      "status": "provider_error",
-      "message": "최신 거래일 검증 대기 · 데이터를 확인하지 못했습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     }
   ],
-  "checkedAt": "2026-11-10T04:26:32.886169+00:00"
+  "checkedAt": "2026-11-10T20:19:54.107380+09:00"
 }

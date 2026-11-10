@@ -1,0 +1,14 @@
+name: Deploy verified November 10 Market Daily recovery
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/deploy-nov10-recovery.yml
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    uses: ./.github/workflows/deploy-study-pages.yml
