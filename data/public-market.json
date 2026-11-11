@@ -55,12 +55,12 @@
       "region": "us",
       "asOf": "2026-11-10",
       "previousAsOf": "2026-11-09",
-      "close": 25065.88,
+      "close": 25065.87,
       "changePct": -0.74,
       "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
       "sourceName": "Yahoo Finance",
       "closeAt": "2026-11-10T21:00:00+00:00",
-      "collectedAt": "2026-11-11T02:04:38.286258+00:00",
+      "collectedAt": "2026-11-11T12:34:07.377074+00:00",
       "verified": false,
       "validated": true,
       "verificationStatus": "pending"
@@ -115,7 +115,7 @@
       "verificationReason": "provider_error"
     }
   ],
-  "checkedAt": "2026-11-11T02:03:56.138145+00:00",
+  "checkedAt": "2026-11-11T12:33:26.165142+00:00",
   "lastVerifiedUs": [
     {
       "id": "nasdaq",
