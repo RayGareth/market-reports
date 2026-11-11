@@ -104,7 +104,7 @@ def revise_dated_study(root, session_day, region, result):
     order = list(INSTRUMENTS)
     rows = sorted(merged.values(), key=lambda row: order.index(row["id"]))
     states = sorted(status_by_id.values(), key=lambda state: order.index(state["id"]))
-    build(root, session_day, market={"indices": rows, "marketStatus": states})
+    build(root, session_day, market={"indices": rows, "marketStatus": states}, write_dashboard=False)
     return True
 
 

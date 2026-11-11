@@ -215,7 +215,7 @@ def insert_usage_notice(page):
     notice = '<aside class="container usage-notice" id="usage-notice" aria-label="자료 이용 안내"><p>' + esc(USAGE_NOTICE) + '</p></aside>'
     return page.replace('<footer>', '<footer>' + notice, 1)
 
-def build(root, day, backfill=False, market=None):
+def build(root, day, backfill=False, market=None, *, write_dashboard=True):
     folder = root / 'content/daily'
     manuscript = folder / (day.isoformat() + '.json')
     original_target = root / 'reports/daily' / (day.isoformat() + '.html')
@@ -285,6 +285,8 @@ def build(root, day, backfill=False, market=None):
         alias = latest_html.replace('href="../../', 'href="../').replace('src="../../', 'src="../')
         alias = alias.replace('href="../">리포트 아카이브', 'href="./">리포트 아카이브').replace('href="../">← 아카이브', 'href="./">← 아카이브')
         (root / 'reports/latest.html').write_text(alias)
+        if not write_dashboard:
+            return
         (root / 'data').mkdir(exist_ok=True)
         snapshot = {'reportDate':latest_doc['date'],'indices':latest_doc.get('indices',[]),'distribution':latest_doc.get('distribution',[]),'marketStatus':latest_doc.get('marketStatus',[])}
         if market is not None and day.isoformat() == latest_doc['date']:

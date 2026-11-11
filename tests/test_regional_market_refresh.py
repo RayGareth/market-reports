@@ -263,6 +263,11 @@ class RegionalRefreshTests(unittest.TestCase):
                     shutil.copy2(source, root / folder / source.name)
             originals = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
             build(root, date(2026, 11, 10))
+            dashboard = root / "data/public-market.json"
+            latest_snapshot = json.loads(dashboard.read_text())
+            latest_snapshot["checkedAt"] = "2026-11-11T00:00:00+00:00"
+            dashboard.write_text(json.dumps(latest_snapshot))
+            originals[dashboard] = dashboard.read_bytes()
             current = {'marketStatus': [{'expectedAsOf': '2026-11-09'}]}
             calls = []
 
