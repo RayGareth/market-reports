@@ -34,20 +34,36 @@
       "verifiedAt": "2026-11-10T11:20:22.485431+00:00"
     },
     {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 7520.93,
+      "changePct": -0.38,
+      "source": "https://finance.yahoo.com/quote/%5EGSPC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-10T21:00:00+00:00",
+      "collectedAt": "2026-11-11T02:03:57.751262+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
+    },
+    {
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "asOf": "2026-11-09",
-      "previousAsOf": "2026-11-06",
-      "close": 25253.14,
-      "changePct": 2.74,
-      "verified": true,
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 25065.88,
+      "changePct": -0.74,
       "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
       "sourceName": "Yahoo Finance",
-      "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
-      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
-      "closeAt": "2026-11-09T21:00:00+00:00",
-      "verifiedAt": "2026-11-10T11:20:13.294985+00:00"
+      "closeAt": "2026-11-10T21:00:00+00:00",
+      "collectedAt": "2026-11-11T02:04:38.286258+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
     }
   ],
   "distribution": [],
@@ -80,22 +96,42 @@
       "region": "us",
       "collection": "partial",
       "crossCheck": "pending",
-      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
-      "expectedAsOf": "2026-11-09",
-      "status": "provider_error",
-      "message": "데이터를 확인하지 못했습니다"
+      "expectedCloseAt": "2026-11-10T21:00:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
     },
     {
       "id": "nasdaq",
       "name": "NASDAQ",
       "region": "us",
-      "collection": "complete",
-      "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-09T21:00:00+00:00",
-      "expectedAsOf": "2026-11-09",
-      "status": "verified",
-      "message": "확정 종가 · 교차 검증 완료"
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-10T21:00:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
     }
   ],
-  "checkedAt": "2026-11-10T20:19:54.107380+09:00"
+  "checkedAt": "2026-11-11T02:03:56.138145+00:00",
+  "lastVerifiedUs": [
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-09",
+      "previousAsOf": "2026-11-06",
+      "close": 25253.14,
+      "changePct": 2.74,
+      "verified": true,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
+      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
+      "closeAt": "2026-11-09T21:00:00+00:00",
+      "verifiedAt": "2026-11-10T11:20:13.294985+00:00"
+    }
+  ]
 }
