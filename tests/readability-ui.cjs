@@ -1,17 +1,32 @@
 // Public pending state and synthetic quotes only. No provider calls or private data.
 const {chromium}=require(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright':'playwright');
 const fs=require('fs'),path=require('path'),http=require('http'),assert=require('assert/strict');
+const {execFileSync}=require('child_process');
 const root=path.resolve(__dirname,'..'),baseline=process.env.MARKET_BASELINE_DIR;
 const out=process.env.MARKET_SCREENSHOT_DIR;let active=root;
+const entries=JSON.parse(fs.readFileSync(path.join(root,'reports/index.json')));
+const pendingPath='/reports/'+entries[0].url;
+const snapshot={indices:[],marketStatus:[
+ ['kospi','KOSPI','kr'],['kosdaq','KOSDAQ','kr'],['sp500','S&P 500','us'],['nasdaq','NASDAQ','us'],
+].map(([id,name,region])=>({id,name,region,expectedAsOf:'2026-10-29',status:'missing',message:'최근 마감 자료가 아직 반영되지 않았습니다'}))};
+const pendingPage=execFileSync('python3',['-c',`
+import json, sys
+from datetime import date
+from scripts.build_public_reports import generate, make_doc
+doc = make_doc(date.fromisoformat(sys.argv[1]))
+doc.update(json.load(sys.stdin))
+print(generate(doc))
+`,entries[0].date],{cwd:root,input:JSON.stringify(snapshot),encoding:'utf8'});
 const server=http.createServer((req,res)=>{
  const url=decodeURIComponent(req.url.split('?')[0]);
+ if(active===root && url==='/data/public-market.json'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(snapshot));return;}
+ if(active===root && url===pendingPath){res.setHeader('Content-Type','text/html');res.end(pendingPage);return;}
  const file=url.startsWith('/__fonts__/')&&process.env.MARKET_FONT_DIR?path.join(process.env.MARKET_FONT_DIR,url.slice(11)):path.join(active,url.endsWith('/')?url+'index.html':url);
  try{res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.json')?'application/json':file.endsWith('.css')?'text/css':file.endsWith('.woff2')?'font/woff2':'text/html');res.end(fs.readFileSync(file));}catch{res.statusCode=404;res.end();}
 });
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage']});
- const entries=JSON.parse(fs.readFileSync(path.join(root,'reports/index.json'))),snapshot=JSON.parse(fs.readFileSync(path.join(root,'data/public-market.json')));
  const fontCSS=process.env.MARKET_FONT_DIR?[400,700,800].map(w=>fs.readFileSync(path.join(process.env.MARKET_FONT_DIR,'..',w+'.css'),'utf8').replaceAll('./files/','/__fonts__/')).join('\n'):'';
  if(out)fs.mkdirSync(out,{recursive:true});const results=[];
  for(const width of [320,360,390,768,1280]){

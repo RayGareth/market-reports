@@ -1,5 +1,6 @@
 (() => {
   const names = ['KOSPI', 'KOSDAQ', 'S&P 500', 'NASDAQ'];
+  const usSources = new Map([['sp500', ['S&P 500', 'GSPC']], ['nasdaq', ['NASDAQ', 'IXIC']]]);
   const labels = {
     verification_unavailable: '비교 출처의 검증 자료가 없습니다',
     source_unavailable: '연결된 데이터 출처가 없습니다',
@@ -24,6 +25,16 @@
     node.className = className;
     return node;
   };
+  const isPendingUs = item => {
+    const instrument = usSources.get(item.id);
+    return instrument && item.name === instrument[0] && item.region === 'us' &&
+      item.verified === false && item.validated === true && item.verificationStatus === 'pending' &&
+      item.source === `https://finance.yahoo.com/quote/%5E${instrument[1]}/history/` &&
+      !item.verificationSource && !item.verificationSourceName && !item.verifiedAt &&
+      /^20\d{2}-\d{2}-\d{2}$/.test(item.previousAsOf) && item.previousAsOf < item.asOf &&
+      [item.closeAt, item.collectedAt].every(value => /(?:Z|[+-]\d{2}:\d{2})$/.test(value)) &&
+      Date.parse(item.collectedAt) >= Date.parse(item.closeAt);
+  };
   let refreshing = false;
 
   function fitMarketNumbers() {
@@ -46,6 +57,11 @@
     const price = item?.close.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
     card.append(element('small', name), element('strong', price ?? '자료 확인 대기', item ? '' : 'metric-pending'));
     const older = Boolean(item && state?.expectedAsOf && item.asOf < state.expectedAsOf);
+    const us = name === 'S&P 500' || name === 'NASDAQ';
+    const privatePreview = item?.publication?.status === 'private_only';
+    const reviewing = us && ['disagreement', 'invalid'].includes(state?.status);
+    const validation = item?.verified ? '교차 검증 완료' :
+      (privatePreview ? '단일 출처 · 비교 대기' : '교차 검증 전');
     if (item) {
       const close = timestamp(item.closeAt);
       const change = item.changePct;
@@ -53,7 +69,7 @@
       const formatted = (change > 0 ? '+' : change < 0 ? '−' : '') + Math.abs(change).toFixed(2) + '%';
       card.append(element('small', close ? '마감 ' + close : item.asOf + ' 기준', 'metric-date'));
       card.append(element('span', formatted, 'metric-change market-' + direction));
-      if (older) card.append(element('small', '최신 거래일 검증 대기', 'metric-stale'));
+      if (older && !reviewing) card.append(element('small', '최신 거래일 검증 대기', 'metric-stale'));
     }
 
     const notes = element('details', '', 'market-source-notes');
@@ -63,11 +79,12 @@
     const row = element('div', '', 'market-source-row' + (item ? '' : ' market-source-pending'));
     if (item) {
       const tradeZone = item.region === 'us' ? 'ET' : 'KST';
-      const checkTime = timestamp(item.verifiedAt);
-      const validation = item.verified ? '교차 검증 완료' : '단일 출처 · 비교 대기';
+      const checkTime = item.verified && timestamp(item.verifiedAt);
+      const collected = timestamp(item.collectedAt);
       row.append(element('span', `${validation} · 기준 거래일 ${item.asOf} (${tradeZone})`));
       if (timestamp(item.closeAt)) row.append(element('span', '마감 ' + timestamp(item.closeAt)));
       if (item.previousAsOf) row.append(element('span', `비교 기준 ${item.previousAsOf} 종가`));
+      if (collected) row.append(element('span', '수집 ' + collected));
       if (checkTime) row.append(element('span', '검증 완료 ' + checkTime));
       for (const [url, label] of [[item.source, item.sourceName || '원문'], [item.verificationSource, item.verificationSourceName || '비교 출처']]) {
         if (!/^https:\/\//.test(url || '')) continue;
@@ -81,16 +98,21 @@
         row.append(element('span', notice, 'market-source-copyright'));
       }
     }
-    if (!item || older) {
+    if (!item || older || reviewing) {
       row.dataset.status = state?.status || 'unavailable';
       row.append(element('span', state?.message || labels[state?.status] || '검증 자료 미연결'));
       if (state?.expectedAsOf) {
-        const zone = name === 'S&P 500' || name === 'NASDAQ' ? 'ET' : 'KST';
+        const zone = us ? 'ET' : 'KST';
         row.append(element('span', `확인 대상 ${state.expectedAsOf} (${zone})`));
       }
     }
     notes.append(row);
     card.append(notes);
+    if (reviewing) {
+      card.append(element('small', `재검토 중 · ${state.expectedAsOf}`, 'metric-validation'));
+    } else if (us && item && !privatePreview) {
+      card.append(element('small', validation, 'metric-validation'));
+    }
     return card;
   }
 
@@ -107,11 +129,11 @@
         checkedAt = data.checkedAt;
         states = Array.isArray(data.marketStatus) ? data.marketStatus : [];
         indices = (Array.isArray(data.indices) ? data.indices : []).filter(x =>
-          x.verified === true && /^https:\/\//.test(x.source) &&
+          (x.verified === true || isPendingUs(x)) && /^https:\/\//.test(x.source) &&
           x.publication?.status !== 'private_only' &&
           Number.isFinite(x.close) && x.close > 0 && Number.isFinite(x.changePct) &&
           /^20\d{2}-\d{2}-\d{2}$/.test(x.asOf));
-      } catch { /* Never show unverified data or invent a closing date. */ }
+      } catch { /* Never invent a closing date or price. */ }
       const open = new Set([...target.querySelectorAll('details[open]')].map(details => details.dataset.market));
       const focused = document.activeElement?.closest('#market-metrics details')?.dataset.market;
       target.replaceChildren(...names.map(name => cardFor(name,

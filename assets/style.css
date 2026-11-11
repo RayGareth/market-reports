@@ -223,6 +223,7 @@ body{background:#f7f5ef}
 #market-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
 #market-metrics .metric .metric-date{margin:0 0 4px}
 #market-metrics .metric .metric-stale{display:block;margin-top:4px;line-height:1.5}
+#market-metrics .metric .metric-validation{display:block;font-size:11px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
 #market-metrics .market-source-notes{margin:8px 0 0;padding:0}
 #market-metrics .market-source-notes summary{line-height:1.35;padding:12px 0}
 #market-metrics .market-source-row{padding:0 0 8px;border-bottom:0}

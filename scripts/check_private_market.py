@@ -39,7 +39,7 @@ def preview(root, market, now):
     page.write_text(page.read_text().replace('<body>', '<body><div class="notice">' + BANNER + '</div>'))
     # Only this disposable loopback copy accepts private observations.
     script = root / 'assets/market.js'
-    public_filter = ("x.verified === true && /^https:\\/\\//.test(x.source) &&\n"
+    public_filter = ("(x.verified === true || isPendingUs(x)) && /^https:\\/\\//.test(x.source) &&\n"
                      "          x.publication?.status !== 'private_only'")
     private_filter = ("(x.verified === true || (x.validated === true && x.verificationStatus === 'pending'))"
                       " && /^https:\\/\\//.test(x.source) && x.publication?.status === 'private_only'")

@@ -13,24 +13,62 @@ root=Path(sys.argv[1]);app.build(root,date(2026,10,23));app.build(root,date(2026
 rows=[]
 for i,(id,name,region) in enumerate([('kospi','KOSPI','kr'),('kosdaq','KOSDAQ','kr'),('sp500','S&P 500','us'),('nasdaq','NASDAQ','us')]):
  rows.append({'id':id,'name':name,'region':region,'asOf':'2026-10-26' if region=='kr' else '2026-10-23','previousAsOf':'2026-10-23' if region=='kr' else '2026-10-22','close':123456.78 if id=='nasdaq' else float((i+1)*100+1),'changePct':0.0 if id=='sp500' else 1.0,'closeAt':'2026-10-26T06:30:00Z' if region=='kr' else '2026-10-23T20:00:00Z','verifiedAt':'2026-10-26T09:00:00Z','verified':True,'source':'https://example.invalid/synthetic-primary','verificationSource':'https://example.invalid/synthetic-check','publication':{'status':'approved_public','evidence':'https://example.invalid/test-license'}})
-app.build(root,date(2026,10,26),market={'indices':rows,'marketStatus':[],'checkedAt':'2026-10-26T09:00:00+00:00'})
+pending=rows[2]
+pending.update(verified=False,validated=True,verificationStatus='pending',collectedAt='2026-10-23T23:03:00Z',source='https://finance.yahoo.com/quote/%5EGSPC/history/',sourceName='Yahoo Finance')
+del pending['verificationSource'], pending['verifiedAt']
+app.build(root,date(2026,10,26),market={'indices':rows,'marketStatus':[{'id':'sp500','name':'S&P 500','region':'us','status':'single_source','expectedAsOf':'2026-10-23','message':'교차 검증 전'}],'checkedAt':'2026-10-26T09:00:00+00:00'})
 `,temp,root],{env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
 const server=http.createServer((req,res)=>{let p=path.join(temp,req.url.split('?')[0]);if(p.endsWith('/'))p+='index.html';try{res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.json')?'application/json':p.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(p));}catch{res.statusCode=404;res.end();}});
 (async()=>{await new Promise(r=>server.listen(8766,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu']});const results=[];
 for(const width of [320,360,390,768,1280]){
  const context=await browser.newContext({viewport:{width,height:844},isMobile:width<600});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('https://fonts.googleapis.com/**',r=>r.abort());
- await page.goto('http://127.0.0.1:8766/');await page.waitForFunction(()=>document.querySelector('#market-metrics strong')?.textContent==='101.00');assert.match(await page.locator('#market-date-summary').innerText(),/국내: 2026-10-26 \/ 미국: 2026-10-23/);assert.equal(await page.locator('#market-metrics .market-source-row').count(),4);assert.equal(await page.locator('#market-metrics .market-source-row a').count(),8);assert.equal(await page.locator('#market-metrics a:not(.market-source-notes a)').count(),0);assert(await page.locator('#market-metrics strong').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth)));assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ await page.goto('http://127.0.0.1:8766/');await page.waitForFunction(()=>document.querySelector('#market-metrics strong')?.textContent==='101.00');assert.match(await page.locator('#market-date-summary').innerText(),/국내: 2026-10-26 \/ 미국: 2026-10-23/);assert.equal(await page.locator('#market-metrics .market-source-row').count(),4);assert.equal(await page.locator('#market-metrics .market-source-row a').count(),7);assert.equal(await page.locator('#market-metrics a:not(.market-source-notes a)').count(),0);assert(await page.locator('#market-metrics strong').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth)));assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ const sp500=page.locator('#market-metrics .metric').filter({has:page.getByText('S&P 500',{exact:true})});
+ assert.equal(await sp500.locator(':scope > :last-child').innerText(),'교차 검증 전');
+ assert.equal(await sp500.locator('details a').count(),1);
+ await sp500.locator('summary').click();
+ assert.match(await sp500.locator('details').innerText(),/교차 검증 전 · 기준 거래일 2026-10-23 \(ET\)[\s\S]*수집 10\.24 08:03 KST/);
+ assert(!((await sp500.locator('details').innerText()).includes('검증 완료')));
+ assert.equal(await page.locator('#market-metrics .metric-validation').last().innerText(),'교차 검증 완료');
  assert.equal(await page.locator('#market-metrics .market-flat').innerText(),'0.00%');
  assert.equal(await page.locator('#market-metrics .market-up').first().innerText(),'+1.00%');
  assert.deepEqual(await page.locator('#market-metrics .metric-date').allTextContents(),
   ['마감 10.26 15:30 KST','마감 10.26 15:30 KST','마감 10.24 05:00 KST','마감 10.24 05:00 KST']);
  assert(await page.locator('#market-metrics .metric-date').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth)));
  await page.locator('.quick-access-action').click();assert(page.url().endsWith('2026-10-26-r001.html'));assert.equal(await page.locator('.report-article>section').count(),4);assert.equal(await page.locator('.market-close-table tbody tr').count(),4);assert.equal(await page.locator('.market-source-notes .market-source-row').count(),4);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert.equal(await page.locator('.market-validation-summary').innerText(),'S&P 500 · 교차 검증 전');
  assert.match(await page.locator('.market-close-table').first().innerText(),/2026-10-26/);assert.match(await page.locator('.market-close-table').last().innerText(),/2026-10-23/);
  if(process.env.MARKET_SCREENSHOT_DIR){fs.mkdirSync(process.env.MARKET_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.MARKET_SCREENSHOT_DIR,`synthetic-market-${width}.png`),fullPage:true});}
  await page.getByRole('link',{name:'← 아카이브로 돌아가기'}).click();await page.locator('.report-row').first().waitFor();assert.equal(await page.locator('.report-row').count(),2);await page.locator('.report-row').first().click();assert(page.url().endsWith('2026-10-26-r001.html'));
  // Initial edition remains directly accessible.
  assert.equal((await page.goto('http://127.0.0.1:8766/reports/daily/2026-10-26.html')).status(),200);
+ const live=JSON.parse(fs.readFileSync(path.join(temp,'data/public-market.json')));
+ const primary=live.indices.find(row=>row.id==='sp500');
+ Object.assign(primary,{verified:true,verificationSource:'https://fred.stlouisfed.org/series/SP500',verifiedAt:'2026-10-24T05:00:00Z'});
+ live.marketStatus[0].status='verified';
+ const dataRoute='**/data/public-market.json';
+ const send=route=>route.fulfill({json:live});
+ await page.route(dataRoute,send);await page.goto('http://127.0.0.1:8766/');
+ await sp500.getByText('교차 검증 완료',{exact:true}).waitFor();
+ assert.equal(await sp500.locator('details a').count(),2);
+ primary.asOf='2026-10-22';primary.close=290;primary.closeAt='2026-10-22T20:00:00Z';
+ live.marketStatus[0].status='disagreement';
+ await page.goto('http://127.0.0.1:8766/');
+ await sp500.getByText('재검토 중 · 2026-10-23').waitFor();
+ assert.equal(await sp500.locator('strong').innerText(),'290.00');
+ // A long-lived single-source close retains its date while a newer close waits.
+ delete primary.verificationSource;delete primary.verifiedAt;
+ Object.assign(primary,{verified:false,validated:true,verificationStatus:'pending',previousAsOf:'2026-10-21',collectedAt:'2026-10-22T23:03:00Z'});
+ live.marketStatus[0].status='provider_error';
+ await page.goto('http://127.0.0.1:8766/');
+ await sp500.locator(':scope > .metric-validation').filter({hasText:'교차 검증 전'}).waitFor();
+ assert.equal(await sp500.locator('strong').innerText(),'290.00');
+ assert.equal(await sp500.locator('.metric-stale').innerText(),'최신 거래일 검증 대기');
+ assert.equal(await sp500.locator('details a').count(),1);
+ live.marketStatus[0].status='invalid';
+ await page.goto('http://127.0.0.1:8766/');
+ await sp500.getByText('재검토 중 · 2026-10-23').waitFor();
+ await page.unroute(dataRoute,send);
  await page.route('**/data/public-market.json',r=>r.fulfill({status:503,body:'unavailable'}));await page.goto('http://127.0.0.1:8766/');await page.waitForFunction(()=>document.querySelectorAll('#market-metrics strong').length===4);assert.deepEqual(await page.locator('#market-metrics strong').allTextContents(),Array(4).fill('자료 확인 대기'));assert.deepEqual(errors,[]);results.push({width,regions:true,sourceLinks:true,revisionArchive:true,originalPreserved:true,missingNotice:true,noOverflow:true});await context.close();
 }
 await browser.close();server.close();fs.rmSync(temp,{recursive:true,force:true});console.log(JSON.stringify(results));})().catch(e=>{console.error(e);server.close();process.exit(1)});
