@@ -217,6 +217,92 @@ class RegionalRefreshTests(unittest.TestCase):
         self.assertTrue(all(row["verificationStatus"] == "pending" for row in result["indices"]))
         self.assertTrue(all(state["verificationReason"] == "invalid" for state in result["marketStatus"]))
 
+    def test_long_pending_close_survives_new_sessions_and_advances_without_fred(self):
+        class Feed:
+            def __init__(self, mode):
+                self.mode = mode
+
+            def fetch(self, instrument, target):
+                if self.mode == 'timeout':
+                    raise TimeoutError('private diagnostic')
+                if self.mode == 'invalid':
+                    return [Bar((target - timedelta(days=1)).isoformat(), 100), Bar(target.isoformat(), 0)]
+                return [Bar((target - timedelta(days=1)).isoformat(), 100), Bar(target.isoformat(), 101)]
+
+        def run(now, rows=(), mode='valid'):
+            return collect_region(configuration(), 'us', rows, now,
+                                  {'yahoo': Feed(mode), 'fred': Feed('timeout')},
+                                  verified_clock=lambda: now + timedelta(seconds=2))
+
+        initial = run(MORNING)
+        rows = initial['indices']
+        for days in (1, 2, 7, 14, 28):
+            delayed = run(MORNING + timedelta(days=days), rows, 'timeout')
+            self.assertEqual(delayed['indices'], rows)
+            self.assertTrue(all(state['expectedAsOf'] > rows[0]['asOf'] for state in delayed['marketStatus']))
+            self.assertTrue(all(row['verificationStatus'] == 'pending' for row in delayed['indices']))
+        invalid = run(MORNING + timedelta(days=1), rows, 'invalid')
+        self.assertEqual(invalid['indices'], rows)
+        self.assertTrue(all(state['status'] == 'invalid' for state in invalid['marketStatus']))
+        advanced = run(MORNING + timedelta(days=1), rows)
+        self.assertTrue(all(row['asOf'] > rows[0]['asOf'] for row in advanced['indices']))
+        self.assertTrue(all(state['status'] == 'single_source' for state in advanced['marketStatus']))
+        # An invalid replacement for the same session is never accepted.
+        self.assertEqual(run(MORNING, rows, 'invalid')['indices'], [])
+
+    def test_nov06_missing_sp500_is_retried_without_replacing_newer_report(self):
+        from scripts.refresh_public_market import retry_dated_us_study
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            for folder in ('content/daily', 'reports/daily'):
+                (root / folder).mkdir(parents=True)
+                for suffix in ('', '-r001'):
+                    extension = '.json' if folder.startswith('content') else '.html'
+                    source = ROOT / folder / ('2026-11-06' + suffix + extension)
+                    shutil.copy2(source, root / folder / source.name)
+            originals = {p: p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            build(root, date(2026, 11, 10))
+            current = {'marketStatus': [{'expectedAsOf': '2026-11-09'}]}
+            calls = []
+
+            def feed(config, region, existing, now):
+                calls.append(config['providers']['yahoo']['instruments'])
+                return collect_region(config, region, existing, now,
+                                      {'yahoo': Source(day=date(2026, 11, 6), previous=date(2026, 11, 5)),
+                                       'fred': Source(missing=('sp500',), day=date(2026, 11, 6), previous=date(2026, 11, 5))},
+                                      verified_clock=lambda: datetime.fromisoformat('2026-11-11T00:00:00+00:00'))
+
+            self.assertEqual(retry_dated_us_study(root, date(2026, 11, 11), configuration(), current, feed), 1)
+            edition = root / 'content/daily/2026-11-06-r002.json'
+            row = next(row for row in json.loads(edition.read_text())['indices'] if row['id'] == 'sp500')
+            self.assertEqual(row['verificationStatus'], 'pending')
+            self.assertEqual(calls, [['sp500']])
+            self.assertEqual(retry_dated_us_study(root, date(2026, 11, 11), configuration(), current, feed), 0)
+            self.assertFalse((root / 'content/daily/2026-11-06-r003.json').exists())
+            for path, content in originals.items():
+                self.assertEqual(path.read_bytes(), content)
+            archive = json.loads((root / 'reports/index.json').read_text())
+            self.assertIn('2026-11-10', archive[0]['url'])
+            self.assertIn('2026-11-06-r002', archive[1]['url'])
+
+    def test_invalid_yahoo_withdraws_dated_provisional_with_review_notice(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            pending = collect(configuration(), 'us', adapters={
+                'yahoo': Source(), 'fred': Source(missing=('sp500', 'nasdaq'))})
+            build(root, DAY, market=pending)
+            before = (root / f'reports/daily/{DAY}.html').read_bytes()
+            invalid = {'indices': [], 'marketStatus': [
+                dict(state, status='invalid', message='수치 검증 보류')
+                for state in pending['marketStatus']]}
+            self.assertTrue(revise_dated_study(root, DAY, 'us', invalid))
+            reviewed = root / f'reports/daily/{DAY}-r001.html'
+            self.assertIn('재검토 중', reviewed.read_text())
+            self.assertNotIn('101.00', reviewed.read_text())
+            self.assertFalse(revise_dated_study(root, DAY, 'us', invalid))
+            self.assertEqual((root / f'reports/daily/{DAY}.html').read_bytes(), before)
+
     def test_us_disagreement_withdraws_provisional_and_recovers_without_duplicate_editions(self):
         class Different(Source):
             def fetch(self, instrument, target):

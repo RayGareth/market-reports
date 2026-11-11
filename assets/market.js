@@ -59,7 +59,7 @@
     const older = Boolean(item && state?.expectedAsOf && item.asOf < state.expectedAsOf);
     const us = name === 'S&P 500' || name === 'NASDAQ';
     const privatePreview = item?.publication?.status === 'private_only';
-    const reviewing = us && state?.status === 'disagreement';
+    const reviewing = us && ['disagreement', 'invalid'].includes(state?.status);
     const validation = item?.verified ? '교차 검증 완료' :
       (privatePreview ? '단일 출처 · 비교 대기' : '교차 검증 전');
     if (item) {

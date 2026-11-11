@@ -248,6 +248,17 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 indices.append(pending)
                 state.update(status='single_source', message=PUBLIC_US_PENDING,
                              verificationReason=failure)
+            elif state['status'] != 'verified':
+                # A prior validated Yahoo close does not expire when the next
+                # session or FRED is unavailable. Keep its original dates and
+                # collection time; never present it as the new session's quote.
+                cached = provisional.get(instrument, {})
+                if (cached.get('asOf', '') < target.isoformat()
+                        and cached.get('validated') is True
+                        and cached.get('source') == config['providers']['yahoo']['sourceUrls'][instrument]
+                        and (retained is None or cached['asOf'] > retained['asOf'])):
+                    indices.append(cached)
+                    retained = None
         if region:
             state.update(
                 collection="complete" if len(good) == 2 else ("partial" if good else "unavailable"),

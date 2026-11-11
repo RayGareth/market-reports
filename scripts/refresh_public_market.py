@@ -68,7 +68,7 @@ def revise_dated_study(root, session_day, region, result):
         state["id"]: state for state in result["marketStatus"]
         if state["region"] == region and state.get("expectedAsOf") == target
         and (state["status"] in DISPLAY_STATES
-             or (region == "us" and state["status"] == "disagreement"))
+             or (region == "us" and state["status"] in {"disagreement", "invalid"}))
     }
     candidates = {
         row["id"]: row for row in result["indices"]
@@ -87,10 +87,10 @@ def revise_dated_study(root, session_day, region, result):
         ):
             continue
         prior_status = status_by_id.get(key, {})
-        if state["status"] == "disagreement":
+        if state["status"] in {"disagreement", "invalid"}:
             if before.get("verificationStatus") == "pending" and before["asOf"] == target:
                 del merged[key]
-            elif prior_status.get("status") == "disagreement" and prior_status.get("expectedAsOf") == target:
+            elif prior_status.get("status") == state["status"] and prior_status.get("expectedAsOf") == target:
                 continue
         elif after is None or all(before.get(field) == after.get(field) for field in meaningful):
             continue
@@ -139,7 +139,7 @@ def retry_dated_us_study(root, day, config, current, collect):
         unfinished = {
             state["id"] for state in study.get("marketStatus", [])
             if state["region"] == "us" and state.get("expectedAsOf") == target
-            and state["status"] in ("single_source", "disagreement")
+            and state["status"] in ("single_source", "disagreement", "missing", "provider_error", "invalid", "verification_unavailable")
         }
         if not unfinished:
             continue
@@ -207,7 +207,7 @@ def refresh(root, region, now=None, collect=collect_region):
     if region == "us":
         # U.S. trading date is one day earlier in KST, or older after holidays.
         sessions = {date.fromisoformat(state["expectedAsOf"]) for state in result["marketStatus"]
-                    if state["status"] in DISPLAY_STATES | {"disagreement"} and state.get("expectedAsOf")}
+                    if state["status"] in DISPLAY_STATES | {"disagreement", "invalid"} and state.get("expectedAsOf")}
         for session_day in sorted(sessions):
             if 0 <= (day - session_day).days <= REVISION_WINDOW:
                 revisions += int(revise_dated_study(root, session_day, region, result))

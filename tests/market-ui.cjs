@@ -56,6 +56,18 @@ for(const width of [320,360,390,768,1280]){
  await page.goto('http://127.0.0.1:8766/');
  await sp500.getByText('재검토 중 · 2026-10-23').waitFor();
  assert.equal(await sp500.locator('strong').innerText(),'290.00');
+ // A long-lived single-source close retains its date while a newer close waits.
+ delete primary.verificationSource;delete primary.verifiedAt;
+ Object.assign(primary,{verified:false,validated:true,verificationStatus:'pending',previousAsOf:'2026-10-21',collectedAt:'2026-10-22T23:03:00Z'});
+ live.marketStatus[0].status='provider_error';
+ await page.goto('http://127.0.0.1:8766/');
+ await sp500.getByText('교차 검증 전',{exact:true}).waitFor();
+ assert.equal(await sp500.locator('strong').innerText(),'290.00');
+ assert.equal(await sp500.locator('.metric-stale').innerText(),'최신 거래일 검증 대기');
+ assert.equal(await sp500.locator('details a').count(),1);
+ live.marketStatus[0].status='invalid';
+ await page.goto('http://127.0.0.1:8766/');
+ await sp500.getByText('재검토 중 · 2026-10-23').waitFor();
  await page.unroute(dataRoute,send);
  await page.route('**/data/public-market.json',r=>r.fulfill({status:503,body:'unavailable'}));await page.goto('http://127.0.0.1:8766/');await page.waitForFunction(()=>document.querySelectorAll('#market-metrics strong').length===4);assert.deepEqual(await page.locator('#market-metrics strong').allTextContents(),Array(4).fill('자료 확인 대기'));assert.deepEqual(errors,[]);results.push({width,regions:true,sourceLinks:true,revisionArchive:true,originalPreserved:true,missingNotice:true,noOverflow:true});await context.close();
 }

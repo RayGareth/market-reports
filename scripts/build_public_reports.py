@@ -150,7 +150,7 @@ def generate(doc, audience='public'):
         label = '교차 검증 전' if audience == 'public' else '단일 출처 검증 · 교차 검증 대기'
         overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · ' + label + '</p>'
     for state in doc.get('marketStatus', []):
-        if audience == 'public' and state['region'] == 'us' and state['status'] == 'disagreement':
+        if audience == 'public' and state['region'] == 'us' and state['status'] in {'disagreement', 'invalid'}:
             overview += '<p class="market-validation-summary">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · 재검토 중</p>'
     if doc.get('indices'):
         overview += '<details class="market-source-notes"><summary>출처·검증 정보</summary>'
