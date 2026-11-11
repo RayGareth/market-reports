@@ -61,7 +61,7 @@ for(const width of [320,360,390,768,1280]){
  Object.assign(primary,{verified:false,validated:true,verificationStatus:'pending',previousAsOf:'2026-10-21',collectedAt:'2026-10-22T23:03:00Z'});
  live.marketStatus[0].status='provider_error';
  await page.goto('http://127.0.0.1:8766/');
- await sp500.getByText('교차 검증 전',{exact:true}).waitFor();
+ await sp500.locator(':scope > .metric-validation').filter({hasText:'교차 검증 전'}).waitFor();
  assert.equal(await sp500.locator('strong').innerText(),'290.00');
  assert.equal(await sp500.locator('.metric-stale').innerText(),'최신 거래일 검증 대기');
  assert.equal(await sp500.locator('details a').count(),1);
