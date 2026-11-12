@@ -13,7 +13,7 @@ def git(repo, *args, check=True):
         raise RuntimeError('Git publication operation failed; no remote overwrite attempted')
     return result
 
-def publish(repo, attempts=3, before_push=None, build_args=(), region=None):
+def publish(repo, attempts=3, before_push=None, build_args=(), region=None, recover=False):
     repo = Path(repo).resolve()
     for attempt in range(attempts):
         git(repo, 'fetch', 'origin', 'main')
@@ -24,12 +24,16 @@ def publish(repo, attempts=3, before_push=None, build_args=(), region=None):
             try:
                 if region:
                     command = ['scripts/refresh_public_market.py', '--region', region]
+                    if recover and region == 'kr':
+                        command.append('--recover')
                 else:
                     command = ['scripts/build_public_reports.py', *build_args]
                 result = subprocess.run([os.environ.get('PYTHON', 'python3'), *command],
                                         cwd=work, capture_output=True, text=True)
                 if result.returncode:
                     raise RuntimeError('Public report validation/build failed; no publication')
+                if result.stdout:
+                    print(result.stdout, end='')
                 # U.S. refreshes may also create a dated revision and archive link.
                 outputs = [path for path in OUTPUTS if (work / path).exists()]
                 if outputs:
@@ -53,5 +57,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--region', required=True, choices=('kr', 'us'))
+    parser.add_argument('--recover', action='store_true')
+    args = parser.parse_args()
     print('Published public revision:', publish(Path(__file__).resolve().parents[1],
-                                               region=parser.parse_args().region))
+                                               region=args.region, recover=args.recover))

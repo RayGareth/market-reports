@@ -11,6 +11,9 @@ SYMBOLS = {'kospi':'^KS11', 'kosdaq':'^KQ11', 'sp500':'^GSPC', 'nasdaq':'^IXIC'}
 SERIES = {'sp500':'SP500', 'nasdaq':'NASDAQCOM'}
 FSC_URL = 'https://apis.data.go.kr/1160100/GetMarketIndexInfoService_V2/getStockMarketIndex_V2'
 
+class ObservationError(ValueError):
+    """A validation failure with a fixed, log-safe reason."""
+
 @dataclass(frozen=True)
 class Bar:
     day: str
@@ -19,10 +22,13 @@ class Bar:
 
 def number(value):
     if isinstance(value, bool):
-        raise ValueError('Invalid numeric field')
-    result = float(str(value).replace(',', ''))
+        raise ObservationError('Invalid numeric field')
+    try:
+        result = float(str(value).replace(',', ''))
+    except ValueError:
+        raise ObservationError('Invalid numeric field') from None
     if not math.isfinite(result):
-        raise ValueError('Non-finite numeric field')
+        raise ObservationError('Non-finite numeric field')
     return result
 
 def get_text(url, params=None, headers=None):
@@ -50,7 +56,7 @@ def parse_fred(text, instrument):
 def parse_naver(text):
     rows = json.loads(text)
     if not isinstance(rows, list):
-        raise ValueError('Unexpected provider response')
+        raise ObservationError('Unexpected provider response structure')
     return [Bar(r['localTradedAt'][:10], number(r['closePrice'])) for r in rows]
 
 def parse_fsc(text, instrument):
@@ -140,7 +146,7 @@ class Provider:
             for index, row in data.iterrows():
                 close, low, high = number(row['Close']), number(row['Low']), number(row['High'])
                 if not 0 < low <= close <= high or number(row['Open']) <= 0:
-                    raise ValueError('Inconsistent OHLC')
+                    raise ObservationError('Inconsistent OHLC')
                 result.append(Bar(index.date().isoformat(), close))
             return result
         raise ValueError('Unknown provider adapter')

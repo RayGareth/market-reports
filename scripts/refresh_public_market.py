@@ -155,9 +155,47 @@ def retry_dated_us_study(root, day, config, current, collect):
     return 0
 
 
-def refresh(root, region, now=None, collect=collect_region):
+
+def recover_missing_kr_study(root, now, config, collect, snapshot):
+    """Recover at most one missing completed Korean session within seven days.
+
+    Runs only in the extra morning slot. Never rewrite existing editions or
+    allow a historical session to replace the current dashboard snapshot.
+    """
+    local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
+    for days_ago in range(1, 8):
+        session = local_now.date() - timedelta(days=days_ago)
+        if (root / "reports/daily" / f"{session}.html").exists():
+            continue
+        study_time = datetime.combine(session, time(18, 0), ZoneInfo("Asia/Seoul"))
+        try:
+            completed, _, _ = session_close("XKRX", study_time, config["calendarReviewedThrough"])
+        except (KeyError, ValueError):
+            continue
+        if completed != session:
+            continue  # Weekends and Korean exchange holidays have no study.
+        result = collect(config, "kr", existing=(), now=study_time)
+        korean = [row for row in result["indices"] if row["region"] == "kr"
+                  and row["asOf"] == session.isoformat() and row.get("verified") is True]
+        if {row["id"] for row in korean} != {"kospi", "kosdaq"}:
+            print(f"::warning::Korean study recovery pending for {session}; verified closes unavailable")
+            return None  # Retry in the next slot rather than polling repeatedly.
+        us_rows = [row for row in snapshot["indices"] if row["region"] == "us"]
+        us_states = [state for state in snapshot["marketStatus"] if state["region"] == "us"]
+        historical = study_snapshot(
+            {"indices": us_rows + korean, "marketStatus": us_states + result["marketStatus"]},
+            config, study_time)
+        # Newer U.S. data is excluded by the historical date filter.
+        build(root, session, market=historical, write_dashboard=False)
+        print(f"Recovered missing Korean study for {session}; dashboard preserved")
+        return session
+    return None
+
+
+def refresh(root, region, now=None, collect=collect_region, recover=False):
     now = now or datetime.now(timezone.utc)
-    day = now.astimezone(ZoneInfo("Asia/Seoul")).date()
+    local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
+    day = local_now.date()
     path = root / "data/public-market.json"
     snapshot = json.loads(path.read_text()) if path.is_file() else {}
     config = json.loads((root / "config/market-sources.json").read_text())
@@ -189,17 +227,31 @@ def refresh(root, region, now=None, collect=collect_region):
                distribution=updated["distribution"])
     validate(doc)
 
-    # The collector uses the exchange calendar and waits for the close to
-    # settle. An earlier session or a pending close cannot start today's note.
+    # The Korean evening slots are scheduled on the same UTC date as their
+    # Korean session. A delayed run can cross Korean midnight before UTC
+    # midnight. The exchange calendar still has to verify that exact session.
+    study_time = now
+    if region == "kr" and now.astimezone(timezone.utc).date() < day:
+        day = now.astimezone(timezone.utc).date()
+        study_time = datetime.combine(day, time.max, local_now.tzinfo)
+    if region == "kr" and recover:
+        # The extra morning check targets the most recent completed session.
+        targets = {state.get("expectedAsOf") for state in result["marketStatus"]
+                   if state["region"] == "kr" and state.get("expectedAsOf")}
+        if len(targets) == 1:
+            day = date.fromisoformat(targets.pop())
+            study_time = datetime.combine(day, time(18, 0), ZoneInfo("Asia/Seoul"))
     report = root / "reports/daily" / f"{day}.html"
     built = False
     if region == "kr" and not report.is_file():
-        market = study_snapshot(updated, config, now)
-        if any(row["region"] == "kr" and row["asOf"] == day.isoformat()
+        market = study_snapshot(updated, config, study_time)
+        if any(row["region"] == "kr" and row["asOf"] == day.isoformat() and row.get("verified") is True
                for row in market["indices"]):
-            build(root, day, market=market)
+            build(root, day, market=market, write_dashboard=False)
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
             built = True
+        else:
+            print(f'::warning::No verified Korean close for {day}; daily study not created')
 
     revisions = 0
     if region == "kr" and not built:
@@ -213,6 +265,12 @@ def refresh(root, region, now=None, collect=collect_region):
                 revisions += int(revise_dated_study(root, session_day, region, result))
         revisions += retry_dated_us_study(root, day, config, result, collect)
 
+    if region == "kr" and recover:
+        repaired = recover_missing_kr_study(root, now, config, collect, updated)
+        if repaired is not None:
+            revisions += 1
+            updated["reportDate"] = max(updated.get("reportDate", ""), repaired.isoformat())
+
     # build() regenerates a dated archive alias; the dashboard remains the
     # independent latest-by-region snapshot, never the dated study's snapshot.
     if built or revisions or updated != snapshot:
@@ -225,4 +283,6 @@ def refresh(root, region, now=None, collect=collect_region):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--region", required=True, choices=("kr", "us"))
-    refresh(ROOT, parser.parse_args().region)
+    parser.add_argument("--recover", action="store_true")
+    args = parser.parse_args()
+    refresh(ROOT, args.region, recover=args.recover)

@@ -4,6 +4,7 @@ on:
     - cron: '0 9 * * 1-5'
     - cron: '15 9 * * 1-5'
     - cron: '30 9 * * 1-5'
+    - cron: '40 22 * * 1-5' # Tuesday-Saturday 07:40 KST, prior-session recovery
   workflow_dispatch:
 permissions:
   contents: write
@@ -30,7 +31,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          python scripts/publish_public_study.py --region kr
+          if [ "${{ github.event.schedule }}" = "40 22 * * 1-5" ]; then
+            python scripts/publish_public_study.py --region kr --recover
+          else
+            python scripts/publish_public_study.py --region kr
+          fi
   deploy:
     if: vars.MARKET_PAGES_DEPLOY == 'true'
     needs: publish

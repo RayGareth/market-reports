@@ -1,37 +1,37 @@
 {
-  "reportDate": "2026-11-10",
+  "reportDate": "2026-11-11",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "asOf": "2026-11-10",
-      "previousAsOf": "2026-11-09",
-      "close": 5239.13,
-      "changePct": 4.39,
-      "verified": true,
+      "asOf": "2026-11-11",
+      "previousAsOf": "2026-11-10",
+      "close": 5375.36,
+      "changePct": 2.6,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
       "sourceName": "Yahoo Finance",
+      "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-10T06:30:00+00:00",
-      "verifiedAt": "2026-11-10T11:20:19.122551+00:00"
+      "closeAt": "2026-11-11T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T03:01:57.404928+00:00"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "asOf": "2026-11-10",
-      "previousAsOf": "2026-11-09",
-      "close": 667.61,
-      "changePct": 4.48,
-      "verified": true,
+      "asOf": "2026-11-11",
+      "previousAsOf": "2026-11-10",
+      "close": 705.1,
+      "changePct": 5.62,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
       "sourceName": "Yahoo Finance",
+      "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
       "verificationSourceName": "네이버 금융",
-      "closeAt": "2026-11-10T06:30:00+00:00",
-      "verifiedAt": "2026-11-10T11:20:22.485431+00:00"
+      "closeAt": "2026-11-11T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T03:02:03.938163+00:00"
     },
     {
       "id": "sp500",
@@ -72,23 +72,23 @@
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-11T06:30:00+00:00",
       "expectedAsOf": "2026-11-11",
-      "status": "invalid",
-      "message": "최신 거래일 검증 대기 · 수치 또는 기준일 검증을 통과하지 못했습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-11T06:30:00+00:00",
       "expectedAsOf": "2026-11-11",
-      "status": "invalid",
-      "message": "최신 거래일 검증 대기 · 수치 또는 기준일 검증을 통과하지 못했습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "sp500",
