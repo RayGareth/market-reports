@@ -517,6 +517,50 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertEqual((report.read_bytes(), manuscript.read_bytes()), generated)
             self.assertEqual(list(report.parent.glob("2026-11-11-r*.html")), [])
 
+    def test_kr_morning_slot_recovers_prior_session_and_is_idempotent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(repo, date(2026, 11, 10))
+            original = (repo / "reports/daily/2026-11-10.html").read_bytes()
+            morning = datetime.fromisoformat("2026-11-11T22:40:00+00:00")
+            refresh(repo, "kr", morning, collect, recover=True)
+            report = repo / "reports/daily/2026-11-11.html"
+            self.assertTrue(report.is_file())
+            self.assertFalse((repo / "reports/daily/2026-11-12.html").exists())
+            doc = json.loads((repo / "content/daily/2026-11-11.json").read_text())
+            self.assertEqual({r["id"] for r in doc["indices"] if r["region"] == "kr"},
+                             {"kospi", "kosdaq"})
+            self.assertEqual({r["asOf"] for r in doc["indices"]}, {"2026-11-11"})
+            self.assertEqual((repo / "reports/daily/2026-11-10.html").read_bytes(), original)
+            saved = report.read_bytes()
+            refresh(repo, "kr", morning + timedelta(minutes=15), collect, recover=True)
+            self.assertEqual(report.read_bytes(), saved)
+            self.assertFalse((repo / "reports/daily/2026-11-11-r001.html").exists())
+
+    def test_kr_morning_slot_backfills_older_gap_without_replacing_latest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            for day in (6, 9, 10, 12):
+                build(repo, date(2026, 11, day))
+            latest_original = (repo / "reports/daily/2026-11-12.html").read_bytes()
+            morning = datetime.fromisoformat("2026-11-12T22:40:00+00:00")
+            refresh(repo, "kr", morning, collect, recover=True)
+            archive = json.loads((repo / "reports/index.json").read_text())
+            self.assertEqual([row["date"] for row in archive],
+                             ["2026-11-12", "2026-11-11", "2026-11-10",
+                              "2026-11-09", "2026-11-06"])
+            self.assertEqual((repo / "reports/daily/2026-11-12.html").read_bytes(), latest_original)
+            latest = (repo / "reports/latest.html").read_bytes()
+            self.assertIn(b"2026-11-12", latest)
+            self.assertTrue((repo / "reports/daily/2026-11-11.html").exists())
+            refresh(repo, "kr", morning + timedelta(minutes=15), collect, recover=True)
+            self.assertEqual(len(json.loads((repo / "reports/index.json").read_text())), 5)
+            self.assertEqual((repo / "reports/latest.html").read_bytes(), latest)
+
     def test_kr_study_excludes_stale_us_snapshot_when_us_slots_were_missed(self):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
