@@ -72,23 +72,23 @@
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "collection": "complete",
-      "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-11T06:30:00+00:00",
-      "expectedAsOf": "2026-11-11",
-      "status": "verified",
-      "message": "확정 종가 · 교차 검증 완료"
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-12T06:30:00+00:00",
+      "expectedAsOf": "2026-11-12",
+      "status": "missing",
+      "message": "최신 거래일 검증 대기 · 최근 마감 자료가 아직 반영되지 않았습니다"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "collection": "complete",
-      "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-11T06:30:00+00:00",
-      "expectedAsOf": "2026-11-11",
-      "status": "verified",
-      "message": "확정 종가 · 교차 검증 완료"
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-12T06:30:00+00:00",
+      "expectedAsOf": "2026-11-12",
+      "status": "missing",
+      "message": "최신 거래일 검증 대기 · 최근 마감 자료가 아직 반영되지 않았습니다"
     },
     {
       "id": "sp500",
@@ -115,7 +115,7 @@
       "verificationReason": "provider_error"
     }
   ],
-  "checkedAt": "2026-11-12T13:38:34.183041+00:00",
+  "checkedAt": "2026-11-12T17:23:03.174763+00:00",
   "lastVerifiedUs": [
     {
       "id": "nasdaq",
