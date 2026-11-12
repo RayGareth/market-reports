@@ -2,6 +2,8 @@
 """Update one regional dashboard snapshot, optionally creating the daily study."""
 import argparse
 import json
+import subprocess
+import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -56,6 +58,24 @@ def dated_study(root, session_day):
         return None
     variants = sorted((root / "content/daily").glob(f"{session_day}-r*.json"))
     return json.loads((variants[-1] if variants else manuscript).read_text())
+
+
+def prepare_section02(root, day, as_of):
+    """A slow source or invalid news payload cannot interrupt daily publication."""
+    try:
+        seen = []
+        for days_ago in range(1, 8):
+            prior = dated_study(root, day - timedelta(days=days_ago)) or {}
+            seen.extend(item['source'] for item in prior.get('section02', {}).get('issues', []))
+        result = subprocess.run([sys.executable, str(root / 'scripts/section02_news.py'),
+                                 day.isoformat(), as_of.isoformat(), *seen],
+                                timeout=13, capture_output=True, check=True)
+        news = json.loads(result.stdout)
+        validate(dict(make_doc(day), section02=news))
+        return news
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        print(f"::warning::Official news unavailable for {day}; continuing daily study")
+        return {"status": "pending", "issues": []}
 
 
 def revise_dated_study(root, session_day, region, result):
@@ -156,7 +176,7 @@ def retry_dated_us_study(root, day, config, current, collect):
 
 
 
-def recover_missing_kr_study(root, now, config, collect, snapshot):
+def recover_missing_kr_study(root, now, config, collect, snapshot, news=None):
     """Recover at most one missing completed Korean session within seven days.
 
     Runs only in the extra morning slot. Never rewrite existing editions or
@@ -186,13 +206,14 @@ def recover_missing_kr_study(root, now, config, collect, snapshot):
             {"indices": us_rows + korean, "marketStatus": us_states + result["marketStatus"]},
             config, study_time)
         # Newer U.S. data is excluded by the historical date filter.
-        build(root, session, market=historical, write_dashboard=False)
+        build(root, session, market=historical, write_dashboard=False,
+              section02=news(root, session, study_time) if news else None)
         print(f"Recovered missing Korean study for {session}; dashboard preserved")
         return session
     return None
 
 
-def refresh(root, region, now=None, collect=collect_region, recover=False):
+def refresh(root, region, now=None, collect=collect_region, recover=False, news=None):
     now = now or datetime.now(timezone.utc)
     local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
     day = local_now.date()
@@ -247,7 +268,8 @@ def refresh(root, region, now=None, collect=collect_region, recover=False):
         market = study_snapshot(updated, config, study_time)
         if any(row["region"] == "kr" and row["asOf"] == day.isoformat() and row.get("verified") is True
                for row in market["indices"]):
-            build(root, day, market=market, write_dashboard=False)
+            build(root, day, market=market, write_dashboard=False,
+                  section02=news(root, day, study_time) if news else None)
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
             built = True
         else:
@@ -266,7 +288,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False):
         revisions += retry_dated_us_study(root, day, config, result, collect)
 
     if region == "kr" and recover:
-        repaired = recover_missing_kr_study(root, now, config, collect, updated)
+        repaired = recover_missing_kr_study(root, now, config, collect, updated, news)
         if repaired is not None:
             revisions += 1
             updated["reportDate"] = max(updated.get("reportDate", ""), repaired.isoformat())
@@ -285,4 +307,4 @@ if __name__ == "__main__":
     parser.add_argument("--region", required=True, choices=("kr", "us"))
     parser.add_argument("--recover", action="store_true")
     args = parser.parse_args()
-    refresh(ROOT, args.region, recover=args.recover)
+    refresh(ROOT, args.region, recover=args.recover, news=prepare_section02 if args.region == 'kr' else None)
