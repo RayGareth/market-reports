@@ -75,6 +75,12 @@ def validate(doc, audience='public'):
     date.fromisoformat(doc['date'])
     if doc.get('schemaVersion') != 4 or doc.get('publication') != 'original_study':
         raise ValueError('Only reviewed four-section original study notes are supported')
+    if 'historicalCloseSupplement' in doc:
+        supplement = doc['historicalCloseSupplement']
+        recorded = datetime.fromisoformat(supplement['recordedAt'])
+        if (recorded.tzinfo is None or recorded.astimezone(ZoneInfo('Asia/Seoul')).date().isoformat() <= doc['date']
+                or not supplement['indices'] or not set(supplement['indices']) <= {'kospi', 'kosdaq', 'sp500', 'nasdaq'}):
+            raise ValueError('Invalid historical close supplement')
     lesson = doc['lesson']
     if not lesson.get('term') or not lesson.get('explanation') or not https(lesson.get('source')):
         raise ValueError('Lesson text and source required')
@@ -130,6 +136,14 @@ def generate(doc, audience='public'):
     validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
     overview = ''
+    if supplement := doc.get('historicalCloseSupplement'):
+        recorded = datetime.fromisoformat(supplement['recordedAt']).astimezone(ZoneInfo('Asia/Seoul'))
+        names = {'kospi': 'KOSPI', 'kosdaq': 'KOSDAQ', 'sp500': 'S&P 500', 'nasdaq': 'NASDAQ'}
+        affected = ', '.join(names[key] for key in supplement['indices'])
+        overview += '<p class="report-status">' + esc(
+            f'{recorded:%Y-%m-%d} KST 종가 사후 보완 · {affected}. 최초 발행 이후 확인한 자료입니다. '
+            '미국 종가의 기준일은 미국 동부시간(ET) 거래일입니다.'
+        ) + '</p>'
     for region, label in [('kr', '국내'), ('us', '미국')]:
         rows = [x for x in doc.get('indices', []) if x['region'] == region]
         overview += '<h3>' + label + ' 주요 지수</h3>'
@@ -231,6 +245,8 @@ def build(root, day, backfill=False, market=None, *, write_dashboard=True):
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
+        if 'historicalCloseSupplement' in market:
+            enriched['historicalCloseSupplement'] = market['historicalCloseSupplement']
         validate(enriched)
         if original_target.exists() or manuscript.exists():
             if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
