@@ -4,10 +4,10 @@ from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
 try:
-    from .market_sources import ADAPTERS, fetch_pair
+    from .market_sources import ADAPTERS, ObservationError, fetch_pair
     from .collect_close import cross_check
 except ImportError:
-    from market_sources import ADAPTERS, fetch_pair
+    from market_sources import ADAPTERS, ObservationError, fetch_pair
     from collect_close import cross_check
 
 INSTRUMENTS = {
@@ -67,23 +67,26 @@ def checked_pair(bars, target, previous):
     from math import isfinite
     values = {}
     for bar in bars:
-        day = date.fromisoformat(bar.day)
+        try:
+            day = date.fromisoformat(bar.day)
+        except ValueError:
+            raise ObservationError('Invalid observation date') from None
         if day > target:
             # A mixed intraday/future record is never treated as a completed close.
             continue
         if day in values:
-            raise ValueError('Duplicate observation date')
+            raise ObservationError('Duplicate observation date')
         if not isfinite(bar.close) or bar.close <= 0:
-            raise ValueError('Invalid price')
+            raise ObservationError('Invalid price')
         values[day] = bar
     if target not in values or previous not in values:
         raise LookupError('Latest session or prior session unavailable')
     current, prior = values[target], values[previous]
     pct = (current.close / prior.close - 1) * 100
     if not isfinite(pct) or abs(pct) > 25:
-        raise ValueError('Implausible return')
+        raise ObservationError('Implausible return')
     if current.reported_pct is not None and (not isfinite(current.reported_pct) or abs(current.reported_pct - pct) > 0.02):
-        raise ValueError('Reported rate differs from close-to-close calculation')
+        raise ObservationError('Reported rate differs from close-to-close calculation')
     return current.close, prior.close, pct
 
 def private_allowed(policy, instrument, today):
@@ -166,16 +169,22 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
         for name, policy in config['providers'].items():
             if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []) or (audience == 'private' and not private_allowed(policy, instrument, now.date())):
                 continue
+            diagnostic = 'valid session pair'
             try:
                 good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
                 if region == 'us' and name == 'yahoo':
                     collected_at = verified_clock().isoformat()
             except LookupError:
                 errors.append('missing')
-            except ValueError:
+                diagnostic = 'required observation or response field missing'
+            except ValueError as exc:
                 errors.append('invalid')
+                diagnostic = str(exc) if isinstance(exc, ObservationError) else 'invalid response'
             except Exception:
                 errors.append('provider_error')
+                diagnostic = 'provider unavailable'
+            if region == 'kr':
+                print(f'{instrument} {name} {target} / {previous}: {diagnostic}')
         failure = errors[0] if errors else 'missing'
         pending = None
         for primary, policy in candidates:
@@ -207,6 +216,8 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                         raise ValueError('Return disagreement')
             except ValueError:
                 failure = 'disagreement'
+                if region == 'kr':
+                    print(f'{instrument} {target}: Yahoo/Naver close or return disagreement')
                 break  # Do not shop for an agreeing pair after a valid source disagrees.
             other, other_policy = checkers[0]
             row.update(verified=True, verificationSource=other_policy['sourceUrls'][instrument],

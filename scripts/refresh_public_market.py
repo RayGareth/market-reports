@@ -157,7 +157,8 @@ def retry_dated_us_study(root, day, config, current, collect):
 
 def refresh(root, region, now=None, collect=collect_region):
     now = now or datetime.now(timezone.utc)
-    day = now.astimezone(ZoneInfo("Asia/Seoul")).date()
+    local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
+    day = local_now.date()
     path = root / "data/public-market.json"
     snapshot = json.loads(path.read_text()) if path.is_file() else {}
     config = json.loads((root / "config/market-sources.json").read_text())
@@ -189,17 +190,24 @@ def refresh(root, region, now=None, collect=collect_region):
                distribution=updated["distribution"])
     validate(doc)
 
-    # The collector uses the exchange calendar and waits for the close to
-    # settle. An earlier session or a pending close cannot start today's note.
+    # The Korean evening slots are scheduled on the same UTC date as their
+    # Korean session. A delayed run can cross Korean midnight before UTC
+    # midnight. The exchange calendar still has to verify that exact session.
+    study_time = now
+    if region == "kr" and now.astimezone(timezone.utc).date() < day:
+        day = now.astimezone(timezone.utc).date()
+        study_time = datetime.combine(day, time.max, local_now.tzinfo)
     report = root / "reports/daily" / f"{day}.html"
     built = False
     if region == "kr" and not report.is_file():
-        market = study_snapshot(updated, config, now)
-        if any(row["region"] == "kr" and row["asOf"] == day.isoformat()
+        market = study_snapshot(updated, config, study_time)
+        if any(row["region"] == "kr" and row["asOf"] == day.isoformat() and row.get("verified") is True
                for row in market["indices"]):
-            build(root, day, market=market)
+            build(root, day, market=market, write_dashboard=False)
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
             built = True
+        else:
+            print(f'::warning::No verified Korean close for {day}; daily study not created')
 
     revisions = 0
     if region == "kr" and not built:

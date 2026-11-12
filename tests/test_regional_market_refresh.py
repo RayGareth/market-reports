@@ -1,9 +1,11 @@
 """Regional publication tests. All provider observations are synthetic."""
 import json
+import io
 import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -469,6 +471,51 @@ class RegionalRefreshTests(unittest.TestCase):
             snapshot = json.loads((repo / "data/public-market.json").read_text())
             self.assertEqual([row["region"] for row in snapshot["indices"]], ["kr", "kr", "us", "us"])
             self.assertEqual(snapshot["reportDate"], "2026-11-05")
+
+    def test_kr_delayed_past_seoul_midnight_publishes_the_completed_session(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "config").mkdir()
+            (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
+            build(repo, date(2026, 11, 10))
+            prior = repo / "reports/daily/2026-11-10.html"
+            original = prior.read_bytes()
+            delayed = datetime.fromisoformat("2026-11-11T16:54:23+00:00")
+            report = repo / "reports/daily/2026-11-11.html"
+            manuscript = repo / "content/daily/2026-11-11.json"
+
+            class InvalidClose(Source):
+                def fetch(self, instrument, target):
+                    return [Bar("2026-11-10", 100), Bar("2026-11-11", 0)]
+
+            def invalid_close(config, region, existing, now):
+                valid = Source(day=date(2026, 11, 11), previous=date(2026, 11, 10))
+                return collect(config, region, existing, now, {"yahoo": InvalidClose(), "naver": valid})
+
+            with redirect_stdout(io.StringIO()) as log:
+                refresh(repo, "kr", delayed, invalid_close)
+            self.assertIn("kospi yahoo 2026-11-11 / 2026-11-10: Invalid price", log.getvalue())
+            self.assertIn("kospi naver 2026-11-11 / 2026-11-10: valid session pair", log.getvalue())
+            self.assertIn("No verified Korean close for 2026-11-11", log.getvalue())
+            self.assertFalse(report.exists())
+            self.assertFalse(manuscript.exists())
+
+            refresh(repo, "kr", delayed, collect)
+            self.assertTrue(report.is_file())
+            doc = json.loads(manuscript.read_text())
+            self.assertEqual(doc["date"], "2026-11-11")
+            self.assertEqual({row["asOf"] for row in doc["indices"]}, {"2026-11-11"})
+            self.assertTrue(all(row["verified"] for row in doc["indices"]))
+            archive = json.loads((repo / "reports/index.json").read_text())
+            self.assertEqual([row["date"] for row in archive], ["2026-11-11", "2026-11-10"])
+            self.assertEqual(archive[0]["url"], "daily/2026-11-11.html")
+            self.assertFalse((report.parent / "2026-11-12.html").exists())
+            self.assertEqual(prior.read_bytes(), original)
+
+            generated = (report.read_bytes(), manuscript.read_bytes())
+            refresh(repo, "kr", delayed + timedelta(minutes=15), collect)
+            self.assertEqual((report.read_bytes(), manuscript.read_bytes()), generated)
+            self.assertEqual(list(report.parent.glob("2026-11-11-r*.html")), [])
 
     def test_kr_study_excludes_stale_us_snapshot_when_us_slots_were_missed(self):
         with tempfile.TemporaryDirectory() as temp:

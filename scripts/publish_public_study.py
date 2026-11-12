@@ -30,6 +30,8 @@ def publish(repo, attempts=3, before_push=None, build_args=(), region=None):
                                         cwd=work, capture_output=True, text=True)
                 if result.returncode:
                     raise RuntimeError('Public report validation/build failed; no publication')
+                if result.stdout:
+                    print(result.stdout, end='')
                 # U.S. refreshes may also create a dated revision and archive link.
                 outputs = [path for path in OUTPUTS if (work / path).exists()]
                 if outputs:

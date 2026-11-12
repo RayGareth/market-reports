@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-11-11",
+  "publication": "original_study",
+  "edition": "daily-study",
+  "headline": "2026-11-11 · 지수 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "asOf": "2026-11-11",
+      "previousAsOf": "2026-11-10",
+      "close": 5375.36,
+      "changePct": 2.6,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-11T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T03:01:57.404928+00:00"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "asOf": "2026-11-11",
+      "previousAsOf": "2026-11-10",
+      "close": 705.1,
+      "changePct": 5.62,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-11T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T03:02:03.938163+00:00"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 7520.93,
+      "changePct": -0.38,
+      "source": "https://finance.yahoo.com/quote/%5EGSPC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-10T21:00:00+00:00",
+      "collectedAt": "2026-11-11T02:03:57.751262+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-10",
+      "previousAsOf": "2026-11-09",
+      "close": 25065.87,
+      "changePct": -0.74,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-10T21:00:00+00:00",
+      "collectedAt": "2026-11-11T12:34:07.377074+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
+    }
+  ],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "지수",
+    "explanation": "시장 지수는 정해진 여러 자산의 움직임을 하나의 수치로 요약합니다. 지수의 움직임과 모든 개별 종목의 움직임이 같지는 않습니다.",
+    "example": "학급 평균이 올라가도 모든 학생의 점수가 오른 것은 아닙니다. 시장 전체의 요약과 개별 기업의 상황도 나누어 읽어보세요.",
+    "question": "지수가 올랐다는 사실만으로 알 수 없는 것은?",
+    "options": [
+      "지수의 방향",
+      "지수가 시장을 요약한다는 점",
+      "모든 구성 종목이 올랐는지 여부"
+    ],
+    "answer": 2,
+    "why": "전체를 요약한 지수와 구성 종목 각각의 움직임은 다를 수 있습니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  },
+  "marketStatus": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-11T06:30:00+00:00",
+      "expectedAsOf": "2026-11-11",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-11T06:30:00+00:00",
+      "expectedAsOf": "2026-11-11",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-10T21:00:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-10T21:00:00+00:00",
+      "expectedAsOf": "2026-11-10",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
+    }
+  ]
+}
