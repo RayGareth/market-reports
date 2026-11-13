@@ -2,15 +2,20 @@
 """Update one regional dashboard snapshot, optionally creating the daily study."""
 import argparse
 import json
+import os
+import subprocess
+import sys
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 try:
     from .build_public_reports import build, make_doc, validate
+    from .section02_news import EVENING_SLOTS, KST, LAST_SLOT
     from .market_close import INSTRUMENTS, MESSAGES, collect_region, session_close
 except ImportError:
     from build_public_reports import build, make_doc, validate
+    from section02_news import EVENING_SLOTS, KST, LAST_SLOT
     from market_close import INSTRUMENTS, MESSAGES, collect_region, session_close
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -56,6 +61,46 @@ def dated_study(root, session_day):
         return None
     variants = sorted((root / "content/daily").glob(f"{session_day}-r*.json"))
     return json.loads((variants[-1] if variants else manuscript).read_text())
+
+
+def prepare_section02(root, day, cutoff):
+    """Use published report history and keep source delays off the publication path."""
+    pending = {"status": "pending", "issues": []}
+    try:
+        index = root / 'reports/index.json'
+        entries = json.loads(index.read_text()) if index.exists() else []
+        after = None
+        seen = set()
+        for report in sorted(entries, key=lambda item: item['date'], reverse=True):
+            if report.get('status') != 'published':
+                continue
+            report_day = date.fromisoformat(report['date'])
+            prior = dated_study(root, report_day)
+            if prior is None:
+                continue
+            news = prior.get('section02', {})
+            seen.update(item['source'] for item in news.get('issues', []))
+            if after is None and report_day < day:
+                # Existing reports have no news cutoff. Use their last scheduled slot.
+                through = news.get('window', {}).get('through')
+                after = (datetime.fromisoformat(through) if through
+                         else datetime.combine(report_day, LAST_SLOT, KST))
+        if after is None:
+            after = datetime.combine(day - timedelta(days=1), LAST_SLOT, KST)
+        window = {'after': after.isoformat(), 'through': cutoff.isoformat()}
+        validate(dict(make_doc(day), section02={**pending, 'window': window}))
+        pending['window'] = window
+        result = subprocess.run([sys.executable, str(root / 'scripts/section02_news.py'),
+                                 window['after'], window['through'], *sorted(seen)],
+                                timeout=13, capture_output=True, check=True)
+        news = json.loads(result.stdout)
+        validate(dict(make_doc(day), section02=news))
+        if news.get('window') != window or any(item['source'] in seen for item in news['issues']):
+            raise ValueError('Official news does not match the publication window or history')
+        return news
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+        print(f"::warning::Official news unavailable for {day}; continuing daily study")
+        return pending
 
 
 def revise_dated_study(root, session_day, region, result):
@@ -156,7 +201,7 @@ def retry_dated_us_study(root, day, config, current, collect):
 
 
 
-def recover_missing_kr_study(root, now, config, collect, snapshot):
+def recover_missing_kr_study(root, now, config, collect, snapshot, news=None):
     """Recover at most one missing completed Korean session within seven days.
 
     Runs only in the extra morning slot. Never rewrite existing editions or
@@ -186,13 +231,14 @@ def recover_missing_kr_study(root, now, config, collect, snapshot):
             {"indices": us_rows + korean, "marketStatus": us_states + result["marketStatus"]},
             config, study_time)
         # Newer U.S. data is excluded by the historical date filter.
-        build(root, session, market=historical, write_dashboard=False)
+        build(root, session, market=historical, write_dashboard=False,
+              section02=news(root, session, datetime.combine(session, LAST_SLOT, KST)) if news else None)
         print(f"Recovered missing Korean study for {session}; dashboard preserved")
         return session
     return None
 
 
-def refresh(root, region, now=None, collect=collect_region, recover=False):
+def refresh(root, region, now=None, collect=collect_region, recover=False, news=None, news_slot=LAST_SLOT):
     now = now or datetime.now(timezone.utc)
     local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
     day = local_now.date()
@@ -247,7 +293,9 @@ def refresh(root, region, now=None, collect=collect_region, recover=False):
         market = study_snapshot(updated, config, study_time)
         if any(row["region"] == "kr" and row["asOf"] == day.isoformat() and row.get("verified") is True
                for row in market["indices"]):
-            build(root, day, market=market, write_dashboard=False)
+            news_cutoff = min(local_now, datetime.combine(day, LAST_SLOT if recover else news_slot, KST))
+            build(root, day, market=market, write_dashboard=False,
+                  section02=news(root, day, news_cutoff) if news else None)
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
             built = True
         else:
@@ -266,7 +314,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False):
         revisions += retry_dated_us_study(root, day, config, result, collect)
 
     if region == "kr" and recover:
-        repaired = recover_missing_kr_study(root, now, config, collect, updated)
+        repaired = recover_missing_kr_study(root, now, config, collect, updated, news)
         if repaired is not None:
             revisions += 1
             updated["reportDate"] = max(updated.get("reportDate", ""), repaired.isoformat())
@@ -285,4 +333,5 @@ if __name__ == "__main__":
     parser.add_argument("--region", required=True, choices=("kr", "us"))
     parser.add_argument("--recover", action="store_true")
     args = parser.parse_args()
-    refresh(ROOT, args.region, recover=args.recover)
+    refresh(ROOT, args.region, recover=args.recover, news=prepare_section02 if args.region == 'kr' else None,
+            news_slot=EVENING_SLOTS.get(os.environ.get('MARKET_NEWS_SCHEDULE'), LAST_SLOT))

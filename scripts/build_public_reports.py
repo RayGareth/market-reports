@@ -12,6 +12,11 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+try:
+    from .section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+except ImportError:
+    from section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+
 ROOT = Path(__file__).resolve().parents[1]
 TITLES = ['오늘의 시장 한눈에 보기', '오늘의 주요 이슈와 시장 흐름', '오늘의 경제 공부', '오늘의 복습 퀴즈']
 SOURCE = 'https://www.investor.gov/introduction-investing'
@@ -72,7 +77,7 @@ def pending_us_close(item):
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
         raise ValueError('Private preview cannot enter the public builder')
-    date.fromisoformat(doc['date'])
+    day = date.fromisoformat(doc['date'])
     if doc.get('schemaVersion') != 4 or doc.get('publication') != 'original_study':
         raise ValueError('Only reviewed four-section original study notes are supported')
     if 'historicalCloseSupplement' in doc:
@@ -109,6 +114,36 @@ def validate(doc, audience='public'):
     for item in doc.get('issues', []):
         if not approved(item) or not item.get('fact'):
             raise ValueError('News needs verified facts and source')
+    if 'section02' in doc:
+        news = doc['section02']
+        issues = news['issues']
+        if 'window' in news:
+            after = datetime.fromisoformat(news['window']['after'])
+            cutoff = datetime.fromisoformat(news['window']['through'])
+            if (after.tzinfo is None or cutoff.tzinfo is None
+                    or after.astimezone(KST).date() >= day
+                    or cutoff.astimezone(KST).date() != day
+                    or cutoff > datetime.combine(day, LAST_SLOT, KST)):
+                raise ValueError('Invalid official news window')
+        if news['status'] == 'pending' and issues == [] and 'concept' not in news:
+            return
+        if (news['status'] != 'ready' or 'window' not in news or not 1 <= len(issues) <= 2
+                or len({item['topic'] for item in issues}) != len(issues)
+                or len({item['source'] for item in issues}) != len(issues)):
+            raise ValueError('Invalid official news selection')
+        for item in issues:
+            published = datetime.fromisoformat(item['publishedAt'])
+            topic, url = item['topic'], item['source']
+            if (not in_window(published, after, cutoff)
+                    or not approved(item) or topic not in SOURCES
+                    or original_url(topic, url) != url or item['sourceName'] != SOURCES[topic][1]
+                    or not release_date_matches(topic, url, published)
+                    or not all(isinstance(item.get(key), str) and item[key].strip()
+                               for key in ('title', 'sourceName', 'fact', 'interpretation', 'study'))):
+                raise ValueError('Official news needs dated and attributed facts')
+        if not all(isinstance(news['concept'].get(key), str) and news['concept'][key].strip()
+                   for key in ('term', 'meaning', 'connection', 'application')):
+            raise ValueError('Official news needs a related economic concept')
 
 def make_doc(day, backfill=False):
     lesson = dict(LESSONS[(day - date(2026, 10, 12)).days % len(LESSONS)])
@@ -212,6 +247,8 @@ def generate(doc, audience='public'):
         issues += '<a href="' + esc(item['source']) + '" target="_blank" rel="noopener noreferrer">원문 출처 읽기 ↗</a></div>'
     if not issues:
         issues = '<p>이 날짜의 주요 뉴스와 시장 반응은 아직 확인된 자료가 등록되지 않았습니다.</p><p>뉴스를 읽을 때는 발표된 사실과 그 영향에 대한 해석을 나누어 기록해 보세요. 이 학습판에서는 당일 시장의 움직임이나 원인을 추정하지 않습니다.</p>'
+    if news := doc.get('section02'):
+        issues = render_official_news(news)
     study = '<div class="reading-item reading-featured"><h3>' + esc(lesson['term']) + '</h3><p>' + esc(lesson['explanation']) + '</p><p>' + esc(lesson['example']) + '</p><a href="' + esc(lesson['source']) + '" target="_blank" rel="noopener noreferrer">개념 참고 자료 · Investor.gov ↗</a></div>'
     controls = ''.join('<label class="quiz-option"><input type="radio" name="answer" value="%d" required><span>%s</span></label>' % (i, esc(opt)) for i, opt in enumerate(lesson['options']))
     quiz = '<div class="quiz"><form id="market-quiz" class="market-quiz" data-answer="%d"><fieldset><legend>%s</legend>%s</fieldset><div class="quiz-controls"><button class="button" type="submit">정답 확인</button><button class="button-ghost" type="reset">다시 풀기</button></div><div id="quiz-feedback" class="quiz-feedback" role="status" aria-live="polite" data-explanation="%s" hidden></div></form></div>' % (lesson['answer'], esc(lesson['question']), controls, esc(lesson['why']))
@@ -223,17 +260,37 @@ def generate(doc, audience='public'):
         note += ' 수정판 ' + str(doc['revision']) + ' · 최초 발행본과 이전 수정판은 보존합니다.'
     return insert_usage_notice('''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f5ef"><title>%s | Market Daily</title><link rel="stylesheet" href="../../assets/style.css"></head><body><header class="site-header"><div class="container nav"><a class="brand" href="../../"><span class="brand-mark">◈</span>MARKET DAILY</a><nav class="navlinks" aria-label="메인 탐색"><a href="../../">대시보드</a><a href="../">리포트 아카이브</a></nav></div></header><main class="container"><section class="hero report-article"><div class="eyebrow">DAILY STUDY / %s</div><h1>%s</h1><p class="lead">%s</p><div class="notice">%s</div></section><article class="report-article">%s<p><a class="button" href="../">← 아카이브로 돌아가기</a></p></article></main><footer><div class="container footer-inner"><div>MARKET DAILY · RAY'S MARKET NOTE</div><div>개인 경제 공부와 시장 기록</div></div></footer><script src="../../assets/quiz.js" defer></script><script src="../../assets/section-market.js" defer></script></body></html>''' % (esc(day), esc(day), esc(doc['headline']), esc(doc['summary']), esc(note), sections))
 
+def render_official_news(news):
+    if news['status'] == 'pending':
+        return '<p class="report-status">확인 대기 · 이번 리포트의 확인 기간에 검증된 공식 발표가 없습니다.</p>'
+    cards = []
+    for item in news['issues']:
+        published = datetime.fromisoformat(item['publishedAt']).astimezone(KST)
+        details = ''.join('<b class="fact-label">' + label + '</b><p>' + esc(item[key]) + '</p>'
+                          for label, key in [('확인된 사실', 'fact'), ('시장과 연결해 보기', 'interpretation'),
+                                             ('공부 포인트', 'study')])
+        cards.append(f'<div class="reading-item"><h3>{esc(item["title"])}</h3>'
+                     f'<p>{published:%Y-%m-%d %H:%M} KST · {esc(item["sourceName"])}</p>{details}'
+                     f'<a href="{esc(item["source"])}" target="_blank" rel="noopener noreferrer">원문 읽기 ↗</a></div>')
+    concept = news['concept']
+    paragraphs = ''.join(f'<p>{esc(concept[key])}</p>' for key in ('meaning', 'connection', 'application'))
+    cards.append(f'<div class="reading-item reading-featured"><h3>경제 개념 · {esc(concept["term"])}</h3>{paragraphs}</div>')
+    return ''.join(cards)
+
+
 def insert_usage_notice(page):
     if 'id="usage-notice"' in page:
         return page
     notice = '<aside class="container usage-notice" id="usage-notice" aria-label="자료 이용 안내"><p>' + esc(USAGE_NOTICE) + '</p></aside>'
     return page.replace('<footer>', '<footer>' + notice, 1)
 
-def build(root, day, backfill=False, market=None, *, write_dashboard=True):
+def build(root, day, backfill=False, market=None, *, write_dashboard=True, section02=None):
     folder = root / 'content/daily'
     manuscript = folder / (day.isoformat() + '.json')
     original_target = root / 'reports/daily' / (day.isoformat() + '.html')
     doc = json.loads(manuscript.read_text()) if manuscript.exists() else make_doc(day, backfill)
+    if section02 is not None and not manuscript.exists() and not original_target.exists():
+        doc['section02'] = section02
     validate(doc)
     if doc['date'] != day.isoformat():
         raise ValueError('Manuscript date mismatch')

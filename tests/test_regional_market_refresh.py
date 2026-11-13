@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from scripts.build_public_reports import build, generate, make_doc, market_close_label
@@ -500,7 +500,12 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertFalse(report.exists())
             self.assertFalse(manuscript.exists())
 
-            refresh(repo, "kr", delayed, collect)
+            def news(root, day, cutoff):
+                self.assertEqual(day, date(2026, 11, 11))
+                self.assertEqual(cutoff.isoformat(), "2026-11-11T18:15:00+09:00")
+                return {"status": "pending", "issues": []}
+
+            refresh(repo, "kr", delayed, collect, news=news, news_slot=time(18, 15))
             self.assertTrue(report.is_file())
             doc = json.loads(manuscript.read_text())
             self.assertEqual(doc["date"], "2026-11-11")
@@ -522,10 +527,16 @@ class RegionalRefreshTests(unittest.TestCase):
             repo = Path(temp)
             (repo / "config").mkdir()
             (repo / "config/market-sources.json").write_text(json.dumps(configuration()))
-            build(repo, date(2026, 11, 10))
+            for existing_day in (5, 6, 9, 10):
+                build(repo, date(2026, 11, existing_day))
             original = (repo / "reports/daily/2026-11-10.html").read_bytes()
             morning = datetime.fromisoformat("2026-11-11T22:40:00+00:00")
-            refresh(repo, "kr", morning, collect, recover=True)
+            def news(root, day, cutoff):
+                self.assertEqual(day, date(2026, 11, 11))
+                self.assertEqual(cutoff.isoformat(), "2026-11-11T18:30:00+09:00")
+                return {"status": "pending", "issues": []}
+
+            refresh(repo, "kr", morning, collect, recover=True, news=news)
             report = repo / "reports/daily/2026-11-11.html"
             self.assertTrue(report.is_file())
             self.assertFalse((repo / "reports/daily/2026-11-12.html").exists())
@@ -590,7 +601,7 @@ class RegionalRefreshTests(unittest.TestCase):
             git(kr, "config", "user.name", "Fixture")
             git(kr, "config", "user.email", "fixture@example.invalid")
             (kr / "scripts").mkdir()
-            for name in ("build_public_reports.py", "market_close.py", "market_sources.py", "collect_close.py"):
+            for name in ("build_public_reports.py", "section02_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
                 shutil.copy(ROOT / "scripts" / name, kr / "scripts")
             shutil.copy(ROOT / "scripts/refresh_public_market.py", kr / "scripts/refresh_impl.py")
             (kr / "scripts/refresh_public_market.py").write_text(
@@ -643,7 +654,7 @@ class RegionalRefreshTests(unittest.TestCase):
             git(repo, "config", "user.email", "fixture@example.invalid")
             build(repo, DAY)
             (repo / "scripts").mkdir()
-            for name in ("build_public_reports.py", "market_close.py", "market_sources.py", "collect_close.py"):
+            for name in ("build_public_reports.py", "section02_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
                 shutil.copy(ROOT / "scripts" / name, repo / "scripts")
             shutil.copy(ROOT / "scripts/refresh_public_market.py", repo / "scripts/refresh_impl.py")
             (repo / "scripts/refresh_public_market.py").write_text(

@@ -9,7 +9,12 @@ from pathlib import Path
 from datetime import date
 sys.path.insert(0,str(Path(sys.argv[2])/'scripts'))
 import build_public_reports as app
-root=Path(sys.argv[1]);app.build(root,date(2026,10,23));app.build(root,date(2026,10,26))
+root=Path(sys.argv[1]);app.build(root,date(2026,10,23),section02={'status':'pending','issues':[]})
+news={'status':'ready','window':{'after':'2026-10-23T18:30:00+09:00','through':'2026-10-26T18:00:00+09:00'},'issues':[{'topic':'policy','title':'검증용 공식 발표','source':'https://www.federalreserve.gov/newsevents/pressreleases/monetary20261025a.htm',
+ 'sourceName':'미국 연방준비제도','publishedAt':'2026-10-26T04:00:00+09:00','verified':True,'fact':'테스트 사실',
+ 'interpretation':'테스트 해석','study':'테스트 공부 포인트'}],
+ 'concept':{'term':'정책금리','meaning':'테스트 개념 의미','connection':'테스트 연결','application':'테스트 적용'}}
+app.build(root,date(2026,10,26),section02=news)
 rows=[]
 for i,(id,name,region) in enumerate([('kospi','KOSPI','kr'),('kosdaq','KOSDAQ','kr'),('sp500','S&P 500','us'),('nasdaq','NASDAQ','us')]):
  rows.append({'id':id,'name':name,'region':region,'asOf':'2026-10-26' if region=='kr' else '2026-10-23','previousAsOf':'2026-10-23' if region=='kr' else '2026-10-22','close':123456.78 if id=='nasdaq' else float((i+1)*100+1),'changePct':0.0 if id=='sp500' else 1.0,'closeAt':'2026-10-26T06:30:00Z' if region=='kr' else '2026-10-23T20:00:00Z','verifiedAt':'2026-10-26T09:00:00Z','verified':True,'source':'https://example.invalid/synthetic-primary','verificationSource':'https://example.invalid/synthetic-check','publication':{'status':'approved_public','evidence':'https://example.invalid/test-license'}})
@@ -36,10 +41,17 @@ for(const width of [320,360,390,768,1280]){
   ['마감 10.26 15:30 KST','마감 10.26 15:30 KST','마감 10.24 05:00 KST','마감 10.24 05:00 KST']);
  assert(await page.locator('#market-metrics .metric-date').evaluateAll(nodes=>nodes.every(n=>n.scrollWidth<=n.clientWidth)));
  await page.locator('.quick-access-action').click();assert(page.url().endsWith('2026-10-26-r001.html'));assert.equal(await page.locator('.report-article>section').count(),4);assert.equal(await page.locator('.market-close-table tbody tr').count(),4);assert.equal(await page.locator('.market-source-notes .market-source-row').count(),4);assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ const news=page.locator('.report-article>section').nth(1);
+ assert.match(await news.innerText(),/검증용 공식 발표[\s\S]*확인된 사실[\s\S]*시장과 연결해 보기[\s\S]*공부 포인트[\s\S]*경제 개념 · 정책금리/);
+ assert.match(await news.innerText(),/2026-10-26 04:00 KST/);
+ assert.equal(await news.getByRole('link',{name:'원문 읽기 ↗'}).getAttribute('href'),'https://www.federalreserve.gov/newsevents/pressreleases/monetary20261025a.htm');
  assert.equal(await page.locator('.market-validation-summary').innerText(),'S&P 500 · 교차 검증 전');
  assert.match(await page.locator('.market-close-table').first().innerText(),/2026-10-26/);assert.match(await page.locator('.market-close-table').last().innerText(),/2026-10-23/);
  if(process.env.MARKET_SCREENSHOT_DIR){fs.mkdirSync(process.env.MARKET_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.MARKET_SCREENSHOT_DIR,`synthetic-market-${width}.png`),fullPage:true});}
  await page.getByRole('link',{name:'← 아카이브로 돌아가기'}).click();await page.locator('.report-row').first().waitFor();assert.equal(await page.locator('.report-row').count(),2);await page.locator('.report-row').first().click();assert(page.url().endsWith('2026-10-26-r001.html'));
+ await page.goto('http://127.0.0.1:8766/reports/daily/2026-10-23.html');
+ assert.match(await news.innerText(),/확인 대기/);
+ assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  // Initial edition remains directly accessible.
  assert.equal((await page.goto('http://127.0.0.1:8766/reports/daily/2026-10-26.html')).status(),200);
  const live=JSON.parse(fs.readFileSync(path.join(temp,'data/public-market.json')));

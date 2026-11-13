@@ -21,7 +21,8 @@ class PublicationTests(unittest.TestCase):
             for r in [repo]:
                 run(r,'config','user.name','Test');run(r,'config','user.email','test@example.invalid')
             (repo/'scripts').mkdir()
-            shutil.copy(ROOT/'scripts/build_public_reports.py',repo/'scripts')
+            for name in ('build_public_reports.py', 'section02_news.py'):
+                shutil.copy(ROOT/'scripts'/name,repo/'scripts')
             run(repo,'add','.');run(repo,'commit','-m','baseline');run(repo,'push','-u','origin','main')
             subprocess.run(['git','clone','-q','--branch','main',str(remote),str(editor)],check=True)
             run(editor,'config','user.name','Editor');run(editor,'config','user.email','editor@example.invalid')

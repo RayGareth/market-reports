@@ -28,10 +28,12 @@ jobs:
       - name: Check public template and data permissions
         run: python -m unittest discover -s tests -p 'test_*.py'
       - name: Publish from latest main with bounded fast-forward retry
+        env:
+          MARKET_NEWS_SCHEDULE: ${{ github.event.schedule }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ "${{ github.event.schedule }}" = "40 22 * * 1-5" ]; then
+          if [ "$MARKET_NEWS_SCHEDULE" = "40 22 * * 1-5" ]; then
             python scripts/publish_public_study.py --region kr --recover
           else
             python scripts/publish_public_study.py --region kr
