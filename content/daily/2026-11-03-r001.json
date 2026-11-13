@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-11-03",
+  "publication": "original_study",
+  "edition": "daily-study",
+  "headline": "2026-11-03 · 지수 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "asOf": "2026-11-03",
+      "previousAsOf": "2026-11-02",
+      "close": 5648.79,
+      "changePct": -3.59,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-03T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T06:01:06.937164+00:00"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "asOf": "2026-11-03",
+      "previousAsOf": "2026-11-02",
+      "close": 704.39,
+      "changePct": -4.08,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-03T06:30:00+00:00",
+      "verifiedAt": "2026-11-12T06:01:06.938191+00:00"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "asOf": "2026-11-03",
+      "previousAsOf": "2026-11-02",
+      "close": 7568.92,
+      "changePct": 0.36,
+      "source": "https://finance.yahoo.com/quote/%5EGSPC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-03T21:00:00+00:00",
+      "collectedAt": "2026-11-12T06:01:07.011777+00:00",
+      "verified": true,
+      "verificationSource": "https://fred.stlouisfed.org/series/SP500",
+      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
+      "verifiedAt": "2026-11-12T06:01:07.011811+00:00"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-03",
+      "previousAsOf": "2026-11-02",
+      "close": 25372.01,
+      "changePct": 0.83,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-03T21:00:00+00:00",
+      "collectedAt": "2026-11-12T06:01:07.012062+00:00",
+      "verified": true,
+      "verificationSource": "https://fred.stlouisfed.org/series/NASDAQCOM",
+      "verificationSourceName": "FRED · 원자료 S&P DJI/Nasdaq",
+      "verifiedAt": "2026-11-12T06:01:07.012085+00:00"
+    }
+  ],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "지수",
+    "explanation": "시장 지수는 정해진 여러 자산의 움직임을 하나의 수치로 요약합니다. 지수의 움직임과 모든 개별 종목의 움직임이 같지는 않습니다.",
+    "example": "학급 평균이 올라가도 모든 학생의 점수가 오른 것은 아닙니다. 시장 전체의 요약과 개별 기업의 상황도 나누어 읽어보세요.",
+    "question": "지수가 올랐다는 사실만으로 알 수 없는 것은?",
+    "options": [
+      "지수의 방향",
+      "지수가 시장을 요약한다는 점",
+      "모든 구성 종목이 올랐는지 여부"
+    ],
+    "answer": 2,
+    "why": "전체를 요약한 지수와 구성 종목 각각의 움직임은 다를 수 있습니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  },
+  "marketStatus": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-03T06:30:00+00:00",
+      "expectedAsOf": "2026-11-03",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-03T06:30:00+00:00",
+      "expectedAsOf": "2026-11-03",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-03T21:00:00+00:00",
+      "expectedAsOf": "2026-11-03",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-03T21:00:00+00:00",
+      "expectedAsOf": "2026-11-03",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    }
+  ],
+  "historicalCloseSupplement": {
+    "recordedAt": "2026-11-12T06:00:29.456411+00:00",
+    "indices": [
+      "kospi",
+      "kosdaq",
+      "sp500",
+      "nasdaq"
+    ]
+  },
+  "revision": 1
+}
