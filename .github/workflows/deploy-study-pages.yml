@@ -7,6 +7,10 @@ on:
       - 'content/daily/**'
       - 'reports/**'
       - 'data/public-market.json'
+      - 'scripts/build_public_reports.py'
+      - 'scripts/refresh_public_market.py'
+      - 'scripts/section02_news.py'
+      - '.github/workflows/deploy-study-pages.yml'
 jobs:
   deploy:
     if: vars.MARKET_PAGES_DEPLOY == 'true'
