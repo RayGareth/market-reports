@@ -4,7 +4,7 @@ import html
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date, datetime, time
+from datetime import datetime, time
 from email.utils import parsedate_to_datetime
 from fractions import Fraction
 from urllib.parse import urlsplit
@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo
 
 KST = ZoneInfo("Asia/Seoul")
 ET = ZoneInfo("America/New_York")
+LAST_SLOT = time(18, 30)
+EVENING_SLOTS = {"0 9 * * 1-5": time(18), "15 9 * * 1-5": time(18, 15), "30 9 * * 1-5": LAST_SLOT}
 SOURCES = {
     "policy": ("https://www.federalreserve.gov/feeds/press_monetary.xml", "미국 연방준비제도",
                r"/newsevents/pressreleases/monetary\d{8}a\.htm"),
@@ -110,7 +112,16 @@ def release_fact(topic, summary):
     return None
 
 
-def candidates(topic, cutoff, seen, fetch):
+def release_date_matches(topic, url, published):
+    source_date = published.astimezone(ET).strftime("%Y%m%d" if topic == "policy" else "%m%d%Y")
+    return source_date in urlsplit(url).path
+
+
+def in_window(published, after, cutoff):
+    return published.tzinfo is not None and after < published <= cutoff
+
+
+def candidates(topic, after, cutoff, seen, fetch):
     feed_url, publisher, _ = SOURCES[topic]
     raw = fetch(feed_url)
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", raw, re.I):
@@ -134,11 +145,8 @@ def candidates(topic, cutoff, seen, fetch):
                 # are scheduled for 08:30 ET. Use the later of the two times.
                 earliest = datetime.combine(published.astimezone(ET).date(), time(8, 30), ET)
                 published = max(published, earliest)
-            if (not url or url in seen or published.tzinfo is None
-                    or published.astimezone(KST).date() != cutoff.date() or published > cutoff):
-                continue
-            source_date = published.astimezone(ET).strftime("%Y%m%d" if topic == "policy" else "%m%d%Y")
-            if source_date not in urlsplit(url).path:
+            if (not url or url in seen or not in_window(published, after, cutoff)
+                    or not release_date_matches(topic, url, published)):
                 continue
             fact = (policy_rate(fetch(url)) if topic == "policy"
                     else release_fact(topic, entry.findtext("{*}content", "")))
@@ -158,12 +166,12 @@ def candidates(topic, cutoff, seen, fetch):
     return []
 
 
-def collect(day, as_of, seen=(), fetch=download):
-    cutoff = min(as_of.astimezone(KST), datetime.combine(day, time(18, 30), KST))
+def collect(after, cutoff, seen=(), fetch=download):
+    window = {"after": after.isoformat(), "through": cutoff.isoformat()}
 
     def read(topic):
         try:
-            return candidates(topic, cutoff, seen, fetch) if cutoff.date() == day else []
+            return candidates(topic, after, cutoff, seen, fetch)
         except (OSError, ValueError, ElementTree.ParseError):
             return []
 
@@ -171,17 +179,17 @@ def collect(day, as_of, seen=(), fetch=download):
     with ThreadPoolExecutor(max_workers=len(SOURCES)) as pool:
         issues = [item for batch in pool.map(read, SOURCES) for item in batch][:2]
     if not issues:
-        return {"status": "pending", "issues": []}
+        return {"status": "pending", "issues": [], "window": window}
     concept = issues[0]["concept"]
     for item in issues:
         del item["concept"]
-    return {"status": "ready", "issues": issues, "concept": concept}
+    return {"status": "ready", "issues": issues, "concept": concept, "window": window}
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("day", type=date.fromisoformat)
-    parser.add_argument("as_of", type=datetime.fromisoformat)
-    parser.add_argument("seen", nargs="*")
+    parser.add_argument("after", type=datetime.fromisoformat)
+    parser.add_argument("through", type=datetime.fromisoformat)
+    parser.add_argument("seen", nargs="*", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    print(json.dumps(collect(args.day, args.as_of, args.seen), ensure_ascii=True))
+    print(json.dumps(collect(args.after, args.through, args.seen), ensure_ascii=True))

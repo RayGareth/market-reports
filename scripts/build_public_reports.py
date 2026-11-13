@@ -12,6 +12,11 @@ from datetime import date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+try:
+    from .section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+except ImportError:
+    from section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+
 ROOT = Path(__file__).resolve().parents[1]
 TITLES = ['오늘의 시장 한눈에 보기', '오늘의 주요 이슈와 시장 흐름', '오늘의 경제 공부', '오늘의 복습 퀴즈']
 SOURCE = 'https://www.investor.gov/introduction-investing'
@@ -72,9 +77,15 @@ def pending_us_close(item):
 def validate(doc, audience='public'):
     if audience not in ('public', 'private') or (doc.get('previewAudience') == 'private' and audience != 'private'):
         raise ValueError('Private preview cannot enter the public builder')
-    date.fromisoformat(doc['date'])
+    day = date.fromisoformat(doc['date'])
     if doc.get('schemaVersion') != 4 or doc.get('publication') != 'original_study':
         raise ValueError('Only reviewed four-section original study notes are supported')
+    if 'historicalCloseSupplement' in doc:
+        supplement = doc['historicalCloseSupplement']
+        recorded = datetime.fromisoformat(supplement['recordedAt'])
+        if (recorded.tzinfo is None or recorded.astimezone(ZoneInfo('Asia/Seoul')).date().isoformat() <= doc['date']
+                or not supplement['indices'] or not set(supplement['indices']) <= {'kospi', 'kosdaq', 'sp500', 'nasdaq'}):
+            raise ValueError('Invalid historical close supplement')
     lesson = doc['lesson']
     if not lesson.get('term') or not lesson.get('explanation') or not https(lesson.get('source')):
         raise ValueError('Lesson text and source required')
@@ -106,17 +117,27 @@ def validate(doc, audience='public'):
     if 'section02' in doc:
         news = doc['section02']
         issues = news['issues']
+        if 'window' in news:
+            after = datetime.fromisoformat(news['window']['after'])
+            cutoff = datetime.fromisoformat(news['window']['through'])
+            if (after.tzinfo is None or cutoff.tzinfo is None
+                    or after.astimezone(KST).date() >= day
+                    or cutoff.astimezone(KST).date() != day
+                    or cutoff > datetime.combine(day, LAST_SLOT, KST)):
+                raise ValueError('Invalid official news window')
         if news['status'] == 'pending' and issues == [] and 'concept' not in news:
             return
-        if (news['status'] != 'ready' or not 1 <= len(issues) <= 2
+        if (news['status'] != 'ready' or 'window' not in news or not 1 <= len(issues) <= 2
                 or len({item['topic'] for item in issues}) != len(issues)
                 or len({item['source'] for item in issues}) != len(issues)):
             raise ValueError('Invalid official news selection')
         for item in issues:
             published = datetime.fromisoformat(item['publishedAt'])
-            if (published.tzinfo is None
-                    or published.astimezone(ZoneInfo('Asia/Seoul')).date().isoformat() != doc['date']
-                    or not approved(item)
+            topic, url = item['topic'], item['source']
+            if (not in_window(published, after, cutoff)
+                    or not approved(item) or topic not in SOURCES
+                    or original_url(topic, url) != url or item['sourceName'] != SOURCES[topic][1]
+                    or not release_date_matches(topic, url, published)
                     or not all(isinstance(item.get(key), str) and item[key].strip()
                                for key in ('title', 'sourceName', 'fact', 'interpretation', 'study'))):
                 raise ValueError('Official news needs dated and attributed facts')
@@ -150,6 +171,14 @@ def generate(doc, audience='public'):
     validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
     overview = ''
+    if supplement := doc.get('historicalCloseSupplement'):
+        recorded = datetime.fromisoformat(supplement['recordedAt']).astimezone(ZoneInfo('Asia/Seoul'))
+        names = {'kospi': 'KOSPI', 'kosdaq': 'KOSDAQ', 'sp500': 'S&P 500', 'nasdaq': 'NASDAQ'}
+        affected = ', '.join(names[key] for key in supplement['indices'])
+        overview += '<p class="report-status">' + esc(
+            f'{recorded:%Y-%m-%d} KST 종가 사후 보완 · {affected}. 최초 발행 이후 확인한 자료입니다. '
+            '미국 종가의 기준일은 미국 동부시간(ET) 거래일입니다.'
+        ) + '</p>'
     for region, label in [('kr', '국내'), ('us', '미국')]:
         rows = [x for x in doc.get('indices', []) if x['region'] == region]
         overview += '<h3>' + label + ' 주요 지수</h3>'
@@ -233,10 +262,10 @@ def generate(doc, audience='public'):
 
 def render_official_news(news):
     if news['status'] == 'pending':
-        return '<p class="report-status">확인 대기 · 발행 기준 시각까지 확인된 당일 공식 발표가 없습니다.</p>'
+        return '<p class="report-status">확인 대기 · 이번 리포트의 확인 기간에 검증된 공식 발표가 없습니다.</p>'
     cards = []
     for item in news['issues']:
-        published = datetime.fromisoformat(item['publishedAt']).astimezone(ZoneInfo('Asia/Seoul'))
+        published = datetime.fromisoformat(item['publishedAt']).astimezone(KST)
         details = ''.join('<b class="fact-label">' + label + '</b><p>' + esc(item[key]) + '</p>'
                           for label, key in [('확인된 사실', 'fact'), ('시장과 연결해 보기', 'interpretation'),
                                              ('공부 포인트', 'study')])
@@ -273,6 +302,8 @@ def build(root, day, backfill=False, market=None, *, write_dashboard=True, secti
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
+        if 'historicalCloseSupplement' in market:
+            enriched['historicalCloseSupplement'] = market['historicalCloseSupplement']
         validate(enriched)
         if original_target.exists() or manuscript.exists():
             if any(current.get(k, []) != enriched.get(k, []) for k in ('indices', 'marketStatus')):
