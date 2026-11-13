@@ -251,7 +251,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             state['status'] = failure
         state['message'] = MESSAGES[state['status']]
         if region in ('kr', 'us'):
-            if pending is None and 'yahoo' not in good and failure in ('missing', 'provider_error') and 'invalid' not in errors:
+            if region == 'us' and pending is None and 'yahoo' not in good and failure in ('missing', 'provider_error') and 'invalid' not in errors:
                 cached = provisional.get(instrument, {})
                 if (cached.get('asOf') == target.isoformat() and cached.get('previousAsOf') == previous.isoformat()
                         and cached.get('closeAt') == state['expectedCloseAt']
