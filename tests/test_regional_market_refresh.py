@@ -411,6 +411,68 @@ class RegionalRefreshTests(unittest.TestCase):
                 self.assertEqual(actual_day, day)
                 self.assertEqual(actual_close.isoformat(), close)
 
+    def test_kr_provisional_requires_valid_yahoo_and_transient_checker_failure(self):
+        cfg = configuration()
+        pending = collect(cfg, "kr", adapters={
+            "yahoo": Source(), "naver": Source(missing=("kospi", "kosdaq")),
+        })
+        self.assertEqual({r["id"] for r in pending["indices"]}, {"kospi", "kosdaq"})
+        self.assertTrue(all(row["validated"] is True and row["verified"] is False
+                            for row in pending["indices"]))
+        self.assertTrue(all(state["status"] == "single_source"
+                            for state in pending["marketStatus"]))
+        doc = make_doc(DAY)
+        doc["indices"] = pending["indices"]
+        self.assertIn("교차 검증 전", generate(doc))
+        row = pending["indices"][0]
+        for changes in (
+            {"region": "us"},
+            {"source": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI"},
+            {"collectedAt": "2026-11-04T06:29:00+00:00"},
+            {"collectedAt": "2026-11-04T23:00:00"},
+            {"verificationSource": "https://finance.naver.com/"},
+            {"publication": {"status": "private_only"}},
+        ):
+            with self.subTest(changes=changes):
+                doc["indices"] = [{**row, **changes}]
+                with self.assertRaises(ValueError):
+                    generate(doc)
+
+        missing_yahoo = collect(cfg, "kr", adapters={
+            "yahoo": Source(missing=("kospi", "kosdaq")), "naver": Source(),
+        })
+        self.assertEqual(missing_yahoo["indices"], [])
+
+        class Invalid(Source):
+            def fetch(self, instrument, target):
+                return [Bar(PREVIOUS.isoformat(), 100), Bar(DAY.isoformat(), 0)]
+
+        invalid_checker = collect(cfg, "kr", adapters={
+            "yahoo": Source(), "naver": Invalid(),
+        })
+        self.assertEqual(invalid_checker["indices"], [])
+
+        class Disagree(Source):
+            def fetch(self, instrument, target):
+                return [Bar(PREVIOUS.isoformat(), 100), Bar(DAY.isoformat(), 103)]
+
+        disagreement = collect(cfg, "kr", adapters={
+            "yahoo": Source(), "naver": Disagree(),
+        })
+        self.assertEqual(disagreement["indices"], [])
+        self.assertTrue(all(state["status"] == "disagreement"
+                            for state in disagreement["marketStatus"]))
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            build(root, DAY, market=pending)
+            original = (root / f"reports/daily/{DAY}.html").read_bytes()
+            self.assertTrue(revise_dated_study(root, DAY, "kr", disagreement))
+            self.assertEqual((root / f"reports/daily/{DAY}.html").read_bytes(), original)
+            revision = json.loads((root / f"content/daily/{DAY}-r001.json").read_text())
+            self.assertFalse(revision["indices"])
+            self.assertIn("재검토 중", (root / f"reports/daily/{DAY}-r001.html").read_text())
+
     def test_kr_first_publication_waits_for_same_day_verified_close(self):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
@@ -439,19 +501,27 @@ class RegionalRefreshTests(unittest.TestCase):
                 return collect(config, region, existing, now, feeds)
 
             refresh(repo, "kr", publish_time, missing_close)
-            self.assertEqual(archive.read_bytes(), original_archive)
-            self.assertFalse((repo / "content/daily/2026-11-04.json").exists())
-
-            refresh(repo, "kr", publish_time + timedelta(minutes=15), collect)
             report = repo / "reports/daily/2026-11-04.html"
-            published = report.read_bytes()
-            self.assertIn(b"101.00", published)
+            self.assertTrue(report.exists())
+            pending_original = report.read_bytes()
+            pending_doc = json.loads((repo / "content/daily/2026-11-04.json").read_text())
+            self.assertEqual({row["id"] for row in pending_doc["indices"]}, {"kospi", "kosdaq"})
+            self.assertTrue(all(row["verificationStatus"] == "pending" for row in pending_doc["indices"]))
+            self.assertIn("교차 검증 전".encode(), pending_original)
             self.assertEqual([x["date"] for x in json.loads(archive.read_text())],
                              ["2026-11-04", "2026-10-08"])
+
+            refresh(repo, "kr", publish_time + timedelta(minutes=15), collect)
+            revised = repo / "reports/daily/2026-11-04-r001.html"
+            self.assertTrue(revised.exists())
+            self.assertEqual(report.read_bytes(), pending_original)
+            self.assertIn(b"101.00", revised.read_bytes())
+            self.assertIn("교차 검증 완료".encode(), revised.read_bytes())
+            self.assertEqual(json.loads(archive.read_text())[0]["url"], "daily/2026-11-04-r001.html")
             refresh(repo, "kr", publish_time + timedelta(minutes=30), collect)
-            self.assertEqual(report.read_bytes(), published)
+            self.assertEqual(report.read_bytes(), pending_original)
+            self.assertEqual(len(list(report.parent.glob("2026-11-04-r*.html"))), 1)
             self.assertEqual(original.read_bytes(), original_html)
-            self.assertEqual(list(report.parent.glob("2026-11-04-r*.html")), [])
 
     def test_us_never_creates_report_and_retry_does_not_rewrite_dated_study(self):
         with tempfile.TemporaryDirectory() as temp:
