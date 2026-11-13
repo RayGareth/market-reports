@@ -301,7 +301,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
             built = True
         else:
-            print(f'::warning::No valid completed Korean close for {day}; daily study not created')
+            print(f'::warning::No verified Korean close for {day}; daily study not created')
 
     revisions = 0
     if region == "kr" and not built:
