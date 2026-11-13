@@ -32,7 +32,7 @@ MESSAGES = {
     'latest_pending':'최신 거래일 검증 대기',
     'single_source':'확정 종가 · 단일 출처 검증 · 교차 검증 대기',
 }
-PUBLIC_US_PENDING = '교차 검증 전'
+PUBLIC_PENDING = '교차 검증 전'
 
 def session_close(calendar_name, now, reviewed_through):
     import exchange_calendars as xc
@@ -172,7 +172,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             diagnostic = 'valid session pair'
             try:
                 good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
-                if region == 'us' and name == 'yahoo':
+                if region in ('kr', 'us') and name == 'yahoo':
                     collected_at = verified_clock().isoformat()
             except LookupError:
                 errors.append('missing')
@@ -192,7 +192,7 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 continue
             a, prev_a, pct_a = good[primary]
             row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary)}
-            if region == 'us':
+            if region in ('kr', 'us'):
                 row.update(closeAt=state['expectedCloseAt'], collectedAt=collected_at)
                 cached = provisional.get(instrument, {})
                 if cached.get('collectedAt') and all(cached.get(key) == row[key] for key in (
@@ -203,7 +203,9 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             if not checkers:
                 if not errors:
                     failure = 'verification_unavailable'
-                if region == 'us' and failure in ('missing', 'provider_error', 'invalid'):
+                if ((region == 'us' and failure in ('missing', 'provider_error', 'invalid'))
+                        or (region == 'kr' and failure in ('missing', 'provider_error'))):
+                    # A valid completed Yahoo session can be shown while the independent checker is unavailable.
                     pending = dict(row, verified=False, validated=True, verificationStatus='pending')
                 continue
             try:
@@ -248,8 +250,8 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
         if state.get('status') not in ('verified', 'single_source'):
             state['status'] = failure
         state['message'] = MESSAGES[state['status']]
-        if region == 'us':
-            if pending is None and 'yahoo' not in good and failure in ('missing', 'provider_error') and 'invalid' not in errors:
+        if region in ('kr', 'us'):
+            if region == 'us' and pending is None and 'yahoo' not in good and failure in ('missing', 'provider_error') and 'invalid' not in errors:
                 cached = provisional.get(instrument, {})
                 if (cached.get('asOf') == target.isoformat() and cached.get('previousAsOf') == previous.isoformat()
                         and cached.get('closeAt') == state['expectedCloseAt']
@@ -257,9 +259,9 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                     pending = cached
             if pending is not None:
                 indices.append(pending)
-                state.update(status='single_source', message=PUBLIC_US_PENDING,
+                state.update(status='single_source', message=PUBLIC_PENDING,
                              verificationReason=failure)
-            elif state['status'] != 'verified':
+            elif region == 'us' and state['status'] != 'verified':
                 # A prior validated Yahoo close does not expire when the next
                 # session or FRED is unavailable. Keep its original dates and
                 # collection time; never present it as the new session's quote.

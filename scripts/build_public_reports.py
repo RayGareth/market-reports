@@ -55,10 +55,16 @@ def approved(item, audience='public'):
     return (item.get('verified') is True and https(item.get('source'))
             and item.get('publication', {}).get('status') != 'private_only')
 
-def pending_us_close(item):
-    """Only settled Yahoo U.S. index observations may appear before comparison."""
-    instrument = {'sp500': ('S&P 500', 'GSPC'), 'nasdaq': ('NASDAQ', 'IXIC')}.get(item.get('id'))
-    if (not instrument or item.get('name') != instrument[0] or item.get('region') != 'us'
+def pending_public_close(item):
+    """Only completed Yahoo index observations may be shown before independent comparison."""
+    instruments = {
+        'kospi': ('KOSPI', 'KS11', 'kr', 'Asia/Seoul'),
+        'kosdaq': ('KOSDAQ', 'KQ11', 'kr', 'Asia/Seoul'),
+        'sp500': ('S&P 500', 'GSPC', 'us', 'America/New_York'),
+        'nasdaq': ('NASDAQ', 'IXIC', 'us', 'America/New_York'),
+    }
+    instrument = instruments.get(item.get('id'))
+    if (not instrument or item.get('name') != instrument[0] or item.get('region') != instrument[2]
             or item.get('verified') is not False or item.get('validated') is not True
             or item.get('verificationStatus') != 'pending'
             or item.get('publication', {}).get('status') == 'private_only'
@@ -69,7 +75,7 @@ def pending_us_close(item):
         close = datetime.fromisoformat(item['closeAt'].replace('Z', '+00:00'))
         collected = datetime.fromisoformat(item['collectedAt'].replace('Z', '+00:00'))
         return (close.tzinfo is not None and collected.tzinfo is not None and collected >= close
-                and close.astimezone(ZoneInfo('America/New_York')).date().isoformat() == item['asOf']
+                and close.astimezone(ZoneInfo(instrument[3])).date().isoformat() == item['asOf']
                 and date.fromisoformat(item['previousAsOf']) < date.fromisoformat(item['asOf']))
     except (KeyError, TypeError, ValueError, AttributeError):
         return False
@@ -92,7 +98,7 @@ def validate(doc, audience='public'):
     if not 0 <= lesson['answer'] < len(lesson['options']):
         raise ValueError('Invalid quiz answer')
     for item in doc.get('indices', []):
-        if not approved(item, audience) and not (audience == 'public' and pending_us_close(item)):
+        if not approved(item, audience) and not (audience == 'public' and pending_public_close(item)):
             raise ValueError('Unverified or unattributed market row: refusing to render')
         date.fromisoformat(item['asOf'])
         if item.get('verificationSource') and not https(item['verificationSource']):
@@ -199,7 +205,7 @@ def generate(doc, audience='public'):
         label = '교차 검증 전' if audience == 'public' else '단일 출처 검증 · 교차 검증 대기'
         overview += '<p class="market-validation-summary">' + esc(' · '.join(pending)) + ' · ' + label + '</p>'
     for state in doc.get('marketStatus', []):
-        if audience == 'public' and state['region'] == 'us' and state['status'] in {'disagreement', 'invalid'}:
+        if audience == 'public' and state['status'] in {'disagreement', 'invalid'}:
             overview += '<p class="market-validation-summary">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · 재검토 중</p>'
     if doc.get('indices'):
         overview += '<details class="market-source-notes"><summary>출처·검증 정보</summary>'

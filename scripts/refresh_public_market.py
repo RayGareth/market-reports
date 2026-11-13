@@ -113,7 +113,7 @@ def revise_dated_study(root, session_day, region, result):
         state["id"]: state for state in result["marketStatus"]
         if state["region"] == region and state.get("expectedAsOf") == target
         and (state["status"] in DISPLAY_STATES
-             or (region == "us" and state["status"] in {"disagreement", "invalid"}))
+             or state["status"] in {"disagreement", "invalid"})
     }
     candidates = {
         row["id"]: row for row in result["indices"]
@@ -291,7 +291,9 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
     built = False
     if region == "kr" and not report.is_file():
         market = study_snapshot(updated, config, study_time)
-        if any(row["region"] == "kr" and row["asOf"] == day.isoformat() and row.get("verified") is True
+        if any(row["region"] == "kr" and row["asOf"] == day.isoformat()
+               and (row.get("verified") is True or (row.get("validated") is True
+                    and row.get("verificationStatus") == "pending"))
                for row in market["indices"]):
             news_cutoff = min(local_now, datetime.combine(day, LAST_SLOT if recover else news_slot, KST))
             build(root, day, market=market, write_dashboard=False,
