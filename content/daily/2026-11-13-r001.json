@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 4,
+  "date": "2026-11-13",
+  "publication": "original_study",
+  "edition": "daily-study",
+  "headline": "2026-11-13 · 복리 함께 읽기",
+  "summary": "시장 자료는 확인된 항목만, 경제 공부는 한 가지씩.",
+  "indices": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "asOf": "2026-11-13",
+      "previousAsOf": "2026-11-12",
+      "close": 5290.53,
+      "changePct": -0.98,
+      "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-13T06:30:00+00:00",
+      "verifiedAt": "2026-11-13T11:45:44.171426+00:00"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "asOf": "2026-11-13",
+      "previousAsOf": "2026-11-12",
+      "close": 699.66,
+      "changePct": 0.45,
+      "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
+      "sourceName": "Yahoo Finance",
+      "verified": true,
+      "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
+      "verificationSourceName": "네이버 금융",
+      "closeAt": "2026-11-13T06:30:00+00:00",
+      "verifiedAt": "2026-11-13T11:45:44.780610+00:00"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "asOf": "2026-11-13",
+      "previousAsOf": "2026-11-12",
+      "close": 7561.67,
+      "changePct": -0.4,
+      "source": "https://finance.yahoo.com/quote/%5EGSPC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-13T21:00:00+00:00",
+      "collectedAt": "2026-11-14T02:50:11.580855+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "asOf": "2026-11-13",
+      "previousAsOf": "2026-11-12",
+      "close": 25136.27,
+      "changePct": -0.91,
+      "source": "https://finance.yahoo.com/quote/%5EIXIC/history/",
+      "sourceName": "Yahoo Finance",
+      "closeAt": "2026-11-13T21:00:00+00:00",
+      "collectedAt": "2026-11-14T02:50:51.935139+00:00",
+      "verified": false,
+      "validated": true,
+      "verificationStatus": "pending"
+    }
+  ],
+  "distribution": [],
+  "issues": [],
+  "lesson": {
+    "term": "복리",
+    "explanation": "복리는 원금에서 생긴 이자가 다음 이자를 계산하는 바탕에 함께 들어가는 방식입니다.",
+    "example": "예금을 고를 때는 이율뿐 아니라 이자를 언제 지급하고 다시 계산하는지도 살펴보세요. 실제 수익은 세금과 조건에 따라 달라집니다.",
+    "question": "복리를 설명한 문장은 무엇일까요?",
+    "options": [
+      "원금과 쌓인 이자를 함께 기준으로 이자를 계산한다",
+      "이자를 항상 원금에서만 계산한다",
+      "어떤 상품이든 원금이 보장된다"
+    ],
+    "answer": 0,
+    "why": "복리는 이전에 쌓인 이자도 다음 이자 계산에 포함하는 방식입니다.",
+    "source": "https://www.investor.gov/introduction-investing"
+  },
+  "section02": {
+    "status": "pending",
+    "issues": [],
+    "window": {
+      "after": "2026-11-12T18:30:00+09:00",
+      "through": "2026-11-13T18:30:00+09:00"
+    }
+  },
+  "marketStatus": [
+    {
+      "id": "kospi",
+      "name": "KOSPI",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-13T06:30:00+00:00",
+      "expectedAsOf": "2026-11-13",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "kosdaq",
+      "name": "KOSDAQ",
+      "region": "kr",
+      "collection": "complete",
+      "crossCheck": "passed",
+      "expectedCloseAt": "2026-11-13T06:30:00+00:00",
+      "expectedAsOf": "2026-11-13",
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
+    },
+    {
+      "id": "sp500",
+      "name": "S&P 500",
+      "region": "us",
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-13T21:00:00+00:00",
+      "expectedAsOf": "2026-11-13",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
+    },
+    {
+      "id": "nasdaq",
+      "name": "NASDAQ",
+      "region": "us",
+      "collection": "partial",
+      "crossCheck": "pending",
+      "expectedCloseAt": "2026-11-13T21:00:00+00:00",
+      "expectedAsOf": "2026-11-13",
+      "status": "single_source",
+      "message": "교차 검증 전",
+      "verificationReason": "provider_error"
+    }
+  ],
+  "revision": 1
+}
