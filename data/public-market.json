@@ -1,39 +1,39 @@
 {
-  "reportDate": "2026-11-17",
+  "reportDate": "2026-11-18",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "asOf": "2026-11-17",
-      "previousAsOf": "2026-11-16",
-      "close": 4968.48,
-      "changePct": -2.59,
+      "asOf": "2026-11-18",
+      "previousAsOf": "2026-11-17",
+      "close": 5067.44,
+      "changePct": 1.99,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
       "sourceName": "Yahoo Finance",
-      "closeAt": "2026-11-17T06:30:00+00:00",
-      "collectedAt": "2026-11-18T03:53:18.044377+00:00",
+      "closeAt": "2026-11-18T06:30:00+00:00",
+      "collectedAt": "2026-11-19T03:52:04.699138+00:00",
       "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
       "verificationSourceName": "네이버 금융",
-      "verifiedAt": "2026-11-18T03:53:19.231842+00:00"
+      "verifiedAt": "2026-11-19T03:52:05.908994+00:00"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "asOf": "2026-11-17",
-      "previousAsOf": "2026-11-16",
-      "close": 650.06,
-      "changePct": -2.34,
+      "asOf": "2026-11-18",
+      "previousAsOf": "2026-11-17",
+      "close": 662.81,
+      "changePct": 1.96,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
       "sourceName": "Yahoo Finance",
-      "closeAt": "2026-11-17T06:30:00+00:00",
-      "collectedAt": "2026-11-18T03:53:19.348765+00:00",
+      "closeAt": "2026-11-18T06:30:00+00:00",
+      "collectedAt": "2026-11-19T03:52:06.015512+00:00",
       "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
       "verificationSourceName": "네이버 금융",
-      "verifiedAt": "2026-11-18T03:53:20.140447+00:00"
+      "verifiedAt": "2026-11-19T03:52:06.615300+00:00"
     },
     {
       "id": "sp500",
@@ -74,23 +74,23 @@
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-18T06:30:00+00:00",
       "expectedAsOf": "2026-11-18",
-      "status": "missing",
-      "message": "최신 거래일 검증 대기 · 최근 마감 자료가 아직 반영되지 않았습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "collection": "partial",
-      "crossCheck": "pending",
+      "collection": "complete",
+      "crossCheck": "passed",
       "expectedCloseAt": "2026-11-18T06:30:00+00:00",
       "expectedAsOf": "2026-11-18",
-      "status": "missing",
-      "message": "최신 거래일 검증 대기 · 최근 마감 자료가 아직 반영되지 않았습니다"
+      "status": "verified",
+      "message": "확정 종가 · 교차 검증 완료"
     },
     {
       "id": "sp500",
@@ -117,7 +117,7 @@
       "verificationReason": "provider_error"
     }
   ],
-  "checkedAt": "2026-11-18T17:49:28.371202+00:00",
+  "checkedAt": "2026-11-19T03:52:01.737953+00:00",
   "lastVerifiedUs": [
     {
       "id": "nasdaq",
