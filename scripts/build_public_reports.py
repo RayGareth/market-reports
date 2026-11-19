@@ -215,7 +215,7 @@ def generate(doc, audience='public'):
             overview += '</tbody></table></div>'
 
         else:
-            overview += '<p class="report-status">확인 대기 · 확정 종가·등락률은 자료 검증 후 수정판으로 보완합니다.</p>'
+            overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'
     pending = [row['name'] for row in doc.get('indices', []) if not row.get('verified')]
     if pending:
         label = '교차 검증 전' if audience == 'public' else '단일 출처 검증 · 교차 검증 대기'
