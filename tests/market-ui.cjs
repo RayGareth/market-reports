@@ -14,13 +14,16 @@ news={'status':'ready','window':{'after':'2026-10-23T18:30:00+09:00','through':'
  'sourceName':'미국 연방준비제도','publishedAt':'2026-10-26T04:00:00+09:00','verified':True,'fact':'테스트 사실',
  'interpretation':'테스트 해석','study':'테스트 공부 포인트'}],
  'concept':{'term':'정책금리','meaning':'테스트 개념 의미','connection':'테스트 연결','application':'테스트 적용'}}
-app.build(root,date(2026,10,26),section02=news,market={'indices':[],'marketStatus':[],'firstPublishedAt':'2026-10-26T18:00:00+09:00'})
 rows=[]
 for i,(id,name,region) in enumerate([('kospi','KOSPI','kr'),('kosdaq','KOSDAQ','kr'),('sp500','S&P 500','us'),('nasdaq','NASDAQ','us')]):
  rows.append({'id':id,'name':name,'region':region,'asOf':'2026-10-26' if region=='kr' else '2026-10-23','previousAsOf':'2026-10-23' if region=='kr' else '2026-10-22','close':123456.78 if id=='nasdaq' else float((i+1)*100+1),'changePct':0.0 if id=='sp500' else 1.0,'closeAt':'2026-10-26T06:30:00Z' if region=='kr' else '2026-10-23T20:00:00Z','verifiedAt':'2026-10-26T09:00:00Z','verified':True,'source':'https://example.invalid/synthetic-primary','verificationSource':'https://example.invalid/synthetic-check','publication':{'status':'approved_public','evidence':'https://example.invalid/test-license'}})
 pending=rows[2]
 pending.update(verified=False,validated=True,verificationStatus='pending',collectedAt='2026-10-23T23:03:00Z',source='https://finance.yahoo.com/quote/%5EGSPC/history/',sourceName='Yahoo Finance')
 del pending['verificationSource'], pending['verifiedAt']
+app.build(root,date(2026,10,26),section02=news,market={'indices':[rows[0]],
+ 'marketStatus':[{'id':'kosdaq','name':'KOSDAQ','region':'kr','status':'missing','expectedAsOf':'2026-10-26','message':'자료 확인 대기'}],
+ 'firstPublishedAt':'2026-10-26T18:00:00+09:00'})
+
 app.build(root,date(2026,10,26),market={'indices':rows,'marketStatus':[{'id':'sp500','name':'S&P 500','region':'us','status':'single_source','expectedAsOf':'2026-10-23','message':'교차 검증 전'}],'checkedAt':'2026-10-26T09:00:00+00:00','closeSupplementedAt':'2026-10-27T07:40:00+09:00'})
 `,temp,root],{env:{...process.env,PYTHONDONTWRITEBYTECODE:'1'}});
 const server=http.createServer((req,res)=>{let p=path.join(temp,req.url.split('?')[0]);if(p.endsWith('/'))p+='index.html';try{res.setHeader('Content-Type',p.endsWith('.js')?'application/javascript':p.endsWith('.json')?'application/json':p.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(p));}catch{res.statusCode=404;res.end();}});

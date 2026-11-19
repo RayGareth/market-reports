@@ -21,6 +21,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[1]
 DISPLAY_STATES = {"verified", "single_source"}
 REVISION_WINDOW = 7
+RAY_CLOSE_REQUEST = "국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘."
 
 
 def study_snapshot(snapshot, config, now):
@@ -235,6 +236,9 @@ def recover_missing_kr_study(root, now, config, collect, snapshot, news=None, sk
             {"indices": us_rows + korean, "marketStatus": us_states + result["marketStatus"]},
             config, study_time)
         # Newer U.S. data is excluded by the historical date filter.
+        if not any(row["region"] == "kr" for row in historical["indices"]):
+            print(f"::warning::{session}: {RAY_CLOSE_REQUEST}")
+            return None
         historical["firstPublishedAt"] = now.isoformat()
         build(root, session, market=historical, write_dashboard=False,
               section02=news(root, session, datetime.combine(session, LAST_SLOT, KST)) if news else None)
@@ -303,14 +307,21 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
             print(f"::warning::Publication date unavailable for {day}; study not created")
     if region == "kr" and completed_session and not report.is_file():
         market = study_snapshot(updated, config, study_time)
-        market["firstPublishedAt"] = now.isoformat()
+        has_korean_close = any(row["region"] == "kr" and row["asOf"] == day.isoformat()
+                               for row in market["indices"])
+        if has_korean_close:
+            market["firstPublishedAt"] = now.isoformat()
         news_cutoff = min(local_now, datetime.combine(day, LAST_SLOT if recover else news_slot, KST))
-        build(root, day, market=market, write_dashboard=False,
-              section02=news(root, day, news_cutoff) if news else None)
-        updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
-        built = True
-        if not any(row["region"] == "kr" for row in market["indices"]):
-            print(f"::notice::Korean closes pending for {day}; learning report created")
+        if has_korean_close:
+            build(root, day, market=market, write_dashboard=False,
+                  section02=news(root, day, news_cutoff) if news else None)
+            updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
+            built = True
+        else:
+            print(f"::warning::{day}: {RAY_CLOSE_REQUEST}")
+            print(f"Publication {day}: waiting_for_ray; Korean closes: unavailable")
+            if local_now >= datetime.combine(day, time(19), KST):
+                raise RuntimeError(f"{day} 19:00 KST publication target missed; {RAY_CLOSE_REQUEST}")
 
     revisions = 0
     current_revised = False
@@ -338,7 +349,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
         updated["checkedAt"] = result["checkedAt"]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n")
-    if region == "kr" and completed_session:
+    if region == "kr" and completed_session and (built or report.is_file()):
         current = dated_study(root, day)
         archive = json.loads((root / "reports/index.json").read_text())
         entry = next((entry for entry in archive if entry["date"] == day.isoformat()), None)

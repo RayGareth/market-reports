@@ -571,35 +571,30 @@ class RegionalRefreshTests(unittest.TestCase):
                                    "through": cutoff.isoformat()}}
 
             with redirect_stdout(io.StringIO()) as log:
-                refresh(repo, "kr", delayed, invalid_close, news=news, news_slot=time(18, 15))
+                with self.assertRaises(RuntimeError):
+                    refresh(repo, "kr", delayed, invalid_close)
             self.assertIn("kospi yahoo 2026-11-11 / 2026-11-10: Invalid price", log.getvalue())
-            self.assertIn("kospi naver 2026-11-11 / 2026-11-10: valid session pair", log.getvalue())
-            self.assertIn("learning report created", log.getvalue())
-            self.assertIn("Korean closes: pending", log.getvalue())
-            self.assertTrue(report.is_file())
-            doc = json.loads(manuscript.read_text())
-            self.assertEqual(doc["indices"], [])
-            self.assertEqual(doc["firstPublishedAt"], delayed.isoformat())
-            original_news = doc["section02"]
-            generated = (report.read_bytes(), manuscript.read_bytes())
+            self.assertIn("waiting_for_ray", log.getvalue())
+            self.assertIn("국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘.", log.getvalue())
+            self.assertFalse(report.exists())
 
+            def news(root, day, cutoff):
+                self.assertEqual(day, date(2026, 11, 11))
+                self.assertEqual(cutoff.isoformat(), "2026-11-11T18:15:00+09:00")
+                return {"status": "pending", "issues": [],
+                        "window": {"after": "2026-11-10T18:30:00+09:00",
+                                   "through": cutoff.isoformat()}}
+            refresh(repo, "kr", delayed, collect, news=news, news_slot=time(18, 15))
+            doc = json.loads(manuscript.read_text())
+            self.assertEqual(doc["firstPublishedAt"], delayed.isoformat())
+            self.assertEqual({r["asOf"] for r in doc["indices"]}, {"2026-11-11"})
+            generated = (report.read_bytes(), manuscript.read_bytes())
             refresh(repo, "kr", delayed + timedelta(minutes=15), collect,
                     news=lambda *args: self.fail("Existing news must be preserved"))
-            revision = repo / "content/daily/2026-11-11-r001.json"
-            revised = json.loads(revision.read_text())
-            self.assertEqual(revised["section02"], original_news)
-            self.assertEqual(revised["firstPublishedAt"], doc["firstPublishedAt"])
-            self.assertEqual(revised["closeSupplementedAt"], (delayed + timedelta(minutes=15)).isoformat())
-            self.assertEqual({row["asOf"] for row in revised["indices"]}, {"2026-11-11"})
-            self.assertTrue(all(row["verified"] for row in revised["indices"]))
-            archive = json.loads((repo / "reports/index.json").read_text())
-            self.assertEqual([row["date"] for row in archive], ["2026-11-11", "2026-11-10"])
-            self.assertEqual(archive[0]["url"], "daily/2026-11-11-r001.html")
+            self.assertEqual((report.read_bytes(), manuscript.read_bytes()), generated)
+            self.assertEqual(list(report.parent.glob("2026-11-11-r*.html")), [])
             self.assertFalse((report.parent / "2026-11-12.html").exists())
             self.assertEqual(prior.read_bytes(), original)
-            refresh(repo, "kr", delayed + timedelta(minutes=30), collect)
-            self.assertEqual((report.read_bytes(), manuscript.read_bytes()), generated)
-            self.assertEqual(len(list(report.parent.glob("2026-11-11-r*.html"))), 1)
 
     def test_kr_morning_slot_recovers_prior_session_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -768,7 +763,7 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertEqual(publish(repo, region="us"), head)
 
 
-    def test_missing_all_korean_closes_publishes_learning_and_preserves_news(self):
+    def test_missing_all_korean_closes_requests_ray_then_publishes_partial_close(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "config").mkdir()
@@ -784,16 +779,29 @@ class RegionalRefreshTests(unittest.TestCase):
 
             def news(root, day, cutoff):
                 self.assertEqual(day, date(2026, 11, 16))
-                self.assertEqual(cutoff.isoformat(), "2026-11-16T18:00:00+09:00")
+                self.assertEqual(cutoff.isoformat(), "2026-11-16T18:15:00+09:00")
                 return {"status": "pending", "issues": [],
                         "window": {"after": "2026-11-13T18:30:00+09:00",
                                    "through": cutoff.isoformat()}}
 
             with redirect_stdout(io.StringIO()) as log:
-                refresh(root, "kr", now, missing, news=news, news_slot=time(18))
-            self.assertIn("Publication 2026-11-16: created; Korean closes: pending", log.getvalue())
+                refresh(root, "kr", now, missing,
+                        news=lambda *args: self.fail("News must wait for first domestic close"),
+                        news_slot=time(18))
+            self.assertIn("Publication 2026-11-16: waiting_for_ray", log.getvalue())
+            self.assertFalse((root / "content/daily/2026-11-16.json").exists())
+
+            def partial(config, region, existing, now):
+                target, previous, _ = session_close("XKRX", now, REVIEWED)
+                return collect(config, region, existing, now, {
+                    "yahoo": Source(missing=("kosdaq",), day=target, previous=previous),
+                    "naver": Source(missing=("kospi", "kosdaq"), day=target, previous=previous),
+                })
+            refresh(root, "kr", now + timedelta(minutes=15), partial,
+                    news=news, news_slot=time(18, 15))
             doc = json.loads((root / "content/daily/2026-11-16.json").read_text())
-            self.assertEqual(doc["indices"], [])
+            self.assertEqual([r["id"] for r in doc["indices"]], ["kospi"])
+            self.assertEqual(doc["indices"][0]["verificationStatus"], "pending")
             page = root / "reports/daily/2026-11-16.html"
             self.assertIn("확인 대기", page.read_text())
             self.assertEqual(page.read_text().count('class="eyebrow">SECTION '), 4)
@@ -879,3 +887,22 @@ class RegionalRefreshTests(unittest.TestCase):
             with patch("scripts.refresh_public_market.build"):
                 with self.assertRaises((RuntimeError, FileNotFoundError)):
                     refresh(root, "kr", now, collect)
+
+
+    def test_no_domestic_close_after_1900_fails_with_ray_request(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            (root / "config/market-sources.json").write_text(json.dumps(configuration()))
+            now = datetime.fromisoformat("2026-11-16T10:00:00+00:00")
+            def missing(config, region, existing, now):
+                target, previous, _ = session_close("XKRX", now, REVIEWED)
+                return collect(config, region, existing, now, {
+                    key: Source(missing=("kospi", "kosdaq"), day=target, previous=previous)
+                    for key in ("yahoo", "naver")})
+            with redirect_stdout(io.StringIO()) as log:
+                with self.assertRaisesRegex(RuntimeError, "19:00 KST publication target missed"):
+                    refresh(root, "kr", now, missing)
+            self.assertIn("국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘.", log.getvalue())
+            self.assertFalse((root / "reports/daily/2026-11-16.html").exists())
+            self.assertFalse((root / "content/daily/2026-11-16.json").exists())
