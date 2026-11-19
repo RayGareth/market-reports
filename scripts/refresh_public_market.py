@@ -103,7 +103,7 @@ def prepare_section02(root, day, cutoff):
         return pending
 
 
-def revise_dated_study(root, session_day, region, result):
+def revise_dated_study(root, session_day, region, result, recorded_at=None):
     """Append changed closes or a review notice, preserving all previous editions."""
     current = dated_study(root, session_day)
     if current is None:
@@ -149,7 +149,10 @@ def revise_dated_study(root, session_day, region, result):
     order = list(INSTRUMENTS)
     rows = sorted(merged.values(), key=lambda row: order.index(row["id"]))
     states = sorted(status_by_id.values(), key=lambda state: order.index(state["id"]))
-    build(root, session_day, market={"indices": rows, "marketStatus": states}, write_dashboard=False)
+    market = {"indices": rows, "marketStatus": states}
+    if current.get("firstPublishedAt"):
+        market["closeSupplementedAt"] = (recorded_at or datetime.now(timezone.utc)).isoformat()
+    build(root, session_day, market=market, write_dashboard=False)
     return True
 
 
@@ -201,16 +204,17 @@ def retry_dated_us_study(root, day, config, current, collect):
 
 
 
-def recover_missing_kr_study(root, now, config, collect, snapshot, news=None):
-    """Recover at most one missing completed Korean session within seven days.
-
-    Runs only in the extra morning slot. Never rewrite existing editions or
-    allow a historical session to replace the current dashboard snapshot.
-    """
+def recover_missing_kr_study(root, now, config, collect, snapshot, news=None, skip_day=None):
+    """Recover one missing or unfinished Korean report in the morning slot."""
     local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
     for days_ago in range(1, 8):
         session = local_now.date() - timedelta(days=days_ago)
-        if (root / "reports/daily" / f"{session}.html").exists():
+        if session == skip_day:
+            continue
+        current = dated_study(root, session)
+        if current and {row["id"] for row in current.get("indices", [])
+                        if row["region"] == "kr" and row["asOf"] == session.isoformat()
+                        and row.get("verified") is True} == {"kospi", "kosdaq"}:
             continue
         study_time = datetime.combine(session, time(18, 0), ZoneInfo("Asia/Seoul"))
         try:
@@ -219,18 +223,19 @@ def recover_missing_kr_study(root, now, config, collect, snapshot, news=None):
             continue
         if completed != session:
             continue  # Weekends and Korean exchange holidays have no study.
-        result = collect(config, "kr", existing=(), now=study_time)
+        result = collect(config, "kr", existing=current.get("indices", []) if current else (),
+                         now=study_time)
+        if current:
+            return session if revise_dated_study(root, session, "kr", result, now) else None
         korean = [row for row in result["indices"] if row["region"] == "kr"
-                  and row["asOf"] == session.isoformat() and row.get("verified") is True]
-        if {row["id"] for row in korean} != {"kospi", "kosdaq"}:
-            print(f"::warning::Korean study recovery pending for {session}; verified closes unavailable")
-            return None  # Retry in the next slot rather than polling repeatedly.
+                  and row["asOf"] == session.isoformat()]
         us_rows = [row for row in snapshot["indices"] if row["region"] == "us"]
         us_states = [state for state in snapshot["marketStatus"] if state["region"] == "us"]
         historical = study_snapshot(
             {"indices": us_rows + korean, "marketStatus": us_states + result["marketStatus"]},
             config, study_time)
         # Newer U.S. data is excluded by the historical date filter.
+        historical["firstPublishedAt"] = now.isoformat()
         build(root, session, market=historical, write_dashboard=False,
               section02=news(root, session, datetime.combine(session, LAST_SLOT, KST)) if news else None)
         print(f"Recovered missing Korean study for {session}; dashboard preserved")
@@ -289,23 +294,29 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
             study_time = datetime.combine(day, time(18, 0), ZoneInfo("Asia/Seoul"))
     report = root / "reports/daily" / f"{day}.html"
     built = False
-    if region == "kr" and not report.is_file():
+    completed_session = False
+    if region == "kr":
+        try:
+            completed, _, _ = session_close("XKRX", study_time, config["calendarReviewedThrough"])
+            completed_session = completed == day
+        except (KeyError, ValueError):
+            print(f"::warning::Publication date unavailable for {day}; study not created")
+    if region == "kr" and completed_session and not report.is_file():
         market = study_snapshot(updated, config, study_time)
-        if any(row["region"] == "kr" and row["asOf"] == day.isoformat()
-               and (row.get("verified") is True or (row.get("validated") is True
-                    and row.get("verificationStatus") == "pending"))
-               for row in market["indices"]):
-            news_cutoff = min(local_now, datetime.combine(day, LAST_SLOT if recover else news_slot, KST))
-            build(root, day, market=market, write_dashboard=False,
-                  section02=news(root, day, news_cutoff) if news else None)
-            updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
-            built = True
-        else:
-            print(f'::warning::No verified Korean close for {day}; daily study not created')
+        market["firstPublishedAt"] = now.isoformat()
+        news_cutoff = min(local_now, datetime.combine(day, LAST_SLOT if recover else news_slot, KST))
+        build(root, day, market=market, write_dashboard=False,
+              section02=news(root, day, news_cutoff) if news else None)
+        updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
+        built = True
+        if not any(row["region"] == "kr" for row in market["indices"]):
+            print(f"::notice::Korean closes pending for {day}; learning report created")
 
     revisions = 0
+    current_revised = False
     if region == "kr" and not built:
-        revisions += int(revise_dated_study(root, day, region, result))
+        current_revised = revise_dated_study(root, day, region, result, now)
+        revisions += int(current_revised)
     if region == "us":
         # U.S. trading date is one day earlier in KST, or older after holidays.
         sessions = {date.fromisoformat(state["expectedAsOf"]) for state in result["marketStatus"]
@@ -316,7 +327,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
         revisions += retry_dated_us_study(root, day, config, result, collect)
 
     if region == "kr" and recover:
-        repaired = recover_missing_kr_study(root, now, config, collect, updated, news)
+        repaired = recover_missing_kr_study(root, now, config, collect, updated, news, skip_day=day)
         if repaired is not None:
             revisions += 1
             updated["reportDate"] = max(updated.get("reportDate", ""), repaired.isoformat())
@@ -327,6 +338,20 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
         updated["checkedAt"] = result["checkedAt"]
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(updated, ensure_ascii=False, indent=2) + "\n")
+    if region == "kr" and completed_session:
+        current = dated_study(root, day)
+        archive = json.loads((root / "reports/index.json").read_text())
+        entry = next((entry for entry in archive if entry["date"] == day.isoformat()), None)
+        revision = current.get("revision", 0) if current else 0
+        stem = day.isoformat() + (f"-r{revision:03d}" if revision else "")
+        if (current is None or entry is None or entry["url"] != f"daily/{stem}.html"
+                or not (root / "reports" / entry["url"]).is_file()):
+            raise RuntimeError(f"Publication incomplete for {day}; manuscript, HTML or archive missing")
+        status = "created" if built else "revised" if current_revised else "already_published"
+        ready = {row["id"] for row in current.get("indices", [])
+                 if row["region"] == "kr" and row["asOf"] == day.isoformat()
+                 and row.get("verified") is True} == {"kospi", "kosdaq"}
+        print(f"Publication {day}: {status}; Korean closes: {'verified' if ready else 'pending'}")
     print(f"Refreshed public {region.upper()} market status; study created: {built}; revisions: {revisions}")
 
 

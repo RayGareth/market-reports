@@ -92,6 +92,14 @@ def validate(doc, audience='public'):
         if (recorded.tzinfo is None or recorded.astimezone(ZoneInfo('Asia/Seoul')).date().isoformat() <= doc['date']
                 or not supplement['indices'] or not set(supplement['indices']) <= {'kospi', 'kosdaq', 'sp500', 'nasdaq'}):
             raise ValueError('Invalid historical close supplement')
+    if doc.get('firstPublishedAt'):
+        first = datetime.fromisoformat(doc['firstPublishedAt'])
+        if first.tzinfo is None or first.astimezone(KST).date() < day:
+            raise ValueError('Invalid first publication time')
+        if doc.get('closeSupplementedAt'):
+            supplemented = datetime.fromisoformat(doc['closeSupplementedAt'])
+            if supplemented.tzinfo is None or supplemented < first:
+                raise ValueError('Invalid close supplement time')
     lesson = doc['lesson']
     if not lesson.get('term') or not lesson.get('explanation') or not https(lesson.get('source')):
         raise ValueError('Lesson text and source required')
@@ -131,6 +139,8 @@ def validate(doc, audience='public'):
                     or cutoff.astimezone(KST).date() != day
                     or cutoff > datetime.combine(day, LAST_SLOT, KST)):
                 raise ValueError('Invalid official news window')
+            if doc.get('firstPublishedAt') and cutoff > first:
+                raise ValueError('News cutoff exceeds first publication')
         if news['status'] == 'pending' and issues == [] and 'concept' not in news:
             return
         if (news['status'] != 'ready' or 'window' not in news or not 1 <= len(issues) <= 2
@@ -177,6 +187,12 @@ def generate(doc, audience='public'):
     validate(doc, audience)
     day, lesson = doc['date'], doc['lesson']
     overview = ''
+    if doc.get('firstPublishedAt'):
+        first = datetime.fromisoformat(doc['firstPublishedAt']).astimezone(KST)
+        overview += f'<p class="report-status">최초 발행 {first:%Y-%m-%d %H:%M} KST</p>'
+    if doc.get('closeSupplementedAt'):
+        recorded = datetime.fromisoformat(doc['closeSupplementedAt']).astimezone(KST)
+        overview += f'<p class="report-status">종가 사후 보완 {recorded:%Y-%m-%d %H:%M} KST · 최초 발행본을 보존합니다.</p>'
     if supplement := doc.get('historicalCloseSupplement'):
         recorded = datetime.fromisoformat(supplement['recordedAt']).astimezone(ZoneInfo('Asia/Seoul'))
         names = {'kospi': 'KOSPI', 'kosdaq': 'KOSDAQ', 'sp500': 'S&P 500', 'nasdaq': 'NASDAQ'}
@@ -199,7 +215,7 @@ def generate(doc, audience='public'):
             overview += '</tbody></table></div>'
 
         else:
-            overview += '<p class="report-status">확정 종가·등락률: 공개 가능한 검증 자료가 아직 연결되지 않았습니다.</p>'
+            overview += '<p class="report-status">확인 대기 · 확정 종가·등락률은 자료 검증 후 수정판으로 보완합니다.</p>'
     pending = [row['name'] for row in doc.get('indices', []) if not row.get('verified')]
     if pending:
         label = '교차 검증 전' if audience == 'public' else '단일 출처 검증 · 교차 검증 대기'
@@ -244,7 +260,7 @@ def generate(doc, audience='public'):
         overview += '<p class="report-status">코스피·코스닥 종목 분포: 공개 가능한 검증 자료가 있을 때 표시합니다.</p>'
     for state in doc.get('marketStatus', []):
         if state['status'] != 'verified' and not (state['status'] == 'single_source' and any(x['id'] == state['id'] for x in doc.get('indices', []))):
-            overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(state['message']) + '</p>'
+            overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(('확인 대기 · ' if state['status'] in {'missing', 'provider_error', 'verification_unavailable'} else '') + state['message']) + '</p>'
     issues = ''
     for item in doc.get('issues', []):
         issues += '<div class="reading-item"><b class="fact-label">확인된 사실</b><p>' + esc(item['fact']) + '</p>'
@@ -308,6 +324,10 @@ def build(root, day, backfill=False, market=None, *, write_dashboard=True, secti
         enriched = copy.deepcopy(current)
         enriched['indices'] = market['indices']
         enriched['marketStatus'] = market['marketStatus']
+        if not original_target.exists() and not manuscript.exists() and market.get('firstPublishedAt'):
+            enriched['firstPublishedAt'] = market['firstPublishedAt']
+        if market.get('closeSupplementedAt'):
+            enriched['closeSupplementedAt'] = market['closeSupplementedAt']
         if 'historicalCloseSupplement' in market:
             enriched['historicalCloseSupplement'] = market['historicalCloseSupplement']
         validate(enriched)
