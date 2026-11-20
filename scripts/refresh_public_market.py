@@ -205,6 +205,11 @@ def retry_dated_us_study(root, day, config, current, collect):
 
 
 
+def record_first_manuscript(day, now):
+    if now > datetime.combine(day, time(19), KST):
+        print(f"::warning::Publication {day}: late first manuscript; 19:00 KST target missed")
+
+
 def recover_missing_kr_study(root, now, config, collect, snapshot, news=None, skip_day=None):
     """Recover one missing or unfinished Korean report in the morning slot."""
     local_now = now.astimezone(ZoneInfo("Asia/Seoul"))
@@ -242,6 +247,7 @@ def recover_missing_kr_study(root, now, config, collect, snapshot, news=None, sk
         historical["firstPublishedAt"] = now.isoformat()
         build(root, session, market=historical, write_dashboard=False,
               section02=news(root, session, datetime.combine(session, LAST_SLOT, KST)) if news else None)
+        record_first_manuscript(session, now)
         print(f"Recovered missing Korean study for {session}; dashboard preserved")
         return session
     return None
@@ -316,6 +322,7 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
             build(root, day, market=market, write_dashboard=False,
                   section02=news(root, day, news_cutoff) if news else None)
             updated["reportDate"] = max(day.isoformat(), snapshot.get("reportDate", ""))
+            record_first_manuscript(day, now)
             built = True
         else:
             print(f"::warning::{day}: {RAY_CLOSE_REQUEST}")

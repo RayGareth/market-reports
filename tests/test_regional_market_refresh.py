@@ -584,7 +584,9 @@ class RegionalRefreshTests(unittest.TestCase):
                 return {"status": "pending", "issues": [],
                         "window": {"after": "2026-11-10T18:30:00+09:00",
                                    "through": cutoff.isoformat()}}
-            refresh(repo, "kr", delayed, collect, news=news, news_slot=time(18, 15))
+            with redirect_stdout(io.StringIO()) as log:
+                refresh(repo, "kr", delayed, collect, news=news, news_slot=time(18, 15))
+            self.assertIn("late first manuscript; 19:00 KST target missed", log.getvalue())
             doc = json.loads(manuscript.read_text())
             self.assertEqual(doc["firstPublishedAt"], delayed.isoformat())
             self.assertEqual({r["asOf"] for r in doc["indices"]}, {"2026-11-11"})
