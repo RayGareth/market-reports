@@ -121,12 +121,15 @@ def in_window(published, after, cutoff):
     return published.tzinfo is not None and after < published <= cutoff
 
 
-def candidates(topic, after, cutoff, seen, fetch):
+def candidates(topic, after, cutoff, seen, fetch, outcomes):
+    outcomes[topic] = "no_candidate"
     feed_url, publisher, _ = SOURCES[topic]
     raw = fetch(feed_url)
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", raw, re.I):
-        return []
+        raise ValueError("Invalid feed")
     feed = ElementTree.fromstring(raw)
+    if feed.tag.rsplit("}", 1)[-1] not in {"rss", "feed"}:
+        raise ValueError("Invalid feed")
     entries = feed.findall("./channel/item") if topic == "policy" else feed.findall("./{*}entry")
     for entry in entries:
         try:
@@ -145,12 +148,16 @@ def candidates(topic, after, cutoff, seen, fetch):
                 # are scheduled for 08:30 ET. Use the later of the two times.
                 earliest = datetime.combine(published.astimezone(ET).date(), time(8, 30), ET)
                 published = max(published, earliest)
-            if (not url or url in seen or not in_window(published, after, cutoff)
+            if (not url or not in_window(published, after, cutoff)
                     or not release_date_matches(topic, url, published)):
+                continue
+            if url in seen:
+                outcomes[topic] = "duplicate"
                 continue
             fact = (policy_rate(fetch(url)) if topic == "policy"
                     else release_fact(topic, entry.findtext("{*}content", "")))
         except (TypeError, ValueError, ZeroDivisionError):
+            outcomes[topic] = "error"
             continue
         if fact:
             term, meaning, connection, interpretation, study = LESSONS[topic]
@@ -158,32 +165,40 @@ def candidates(topic, after, cutoff, seen, fetch):
                      else plain(entry.findtext("{*}title", "")))
             if not title:
                 continue
+            outcomes[topic] = "selected"
             return [{"topic": topic, "title": title, "source": url, "sourceName": publisher,
                      "publishedAt": published.isoformat(), "verified": True, "fact": fact,
                      "interpretation": interpretation, "study": study,
                      "concept": {"term": term, "meaning": meaning, "connection": connection,
                                  "application": f"이번 발표에서 확인한 사실 · {fact} {study}"}}]
+        outcomes[topic] = "error"
     return []
 
 
 def collect(after, cutoff, seen=(), fetch=download):
     window = {"after": after.isoformat(), "through": cutoff.isoformat()}
 
+    outcomes = {}
+
     def read(topic):
         try:
-            return candidates(topic, after, cutoff, seen, fetch)
+            return candidates(topic, after, cutoff, seen, fetch, outcomes)
+        except TimeoutError:
+            outcomes[topic] = "timeout"
+            return []
         except (OSError, ValueError, ElementTree.ParseError):
+            outcomes[topic] = "error"
             return []
 
     # Dict order gives priority to a policy decision, then prices and jobs.
     with ThreadPoolExecutor(max_workers=len(SOURCES)) as pool:
         issues = [item for batch in pool.map(read, SOURCES) for item in batch][:2]
     if not issues:
-        return {"status": "pending", "issues": [], "window": window}
+        return {"status": "pending", "issues": [], "window": window, "outcomes": outcomes}
     concept = issues[0]["concept"]
     for item in issues:
         del item["concept"]
-    return {"status": "ready", "issues": issues, "concept": concept, "window": window}
+    return {"status": "ready", "issues": issues, "concept": concept, "window": window, "outcomes": outcomes}
 
 
 if __name__ == "__main__":
