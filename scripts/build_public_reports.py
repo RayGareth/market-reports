@@ -13,9 +13,9 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 try:
-    from .section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+    from .section02_news import KST, LAST_SLOT, LESSONS as NEWS_LESSONS, SOURCES, in_window, original_url, release_date_matches
 except ImportError:
-    from section02_news import KST, LAST_SLOT, SOURCES, in_window, original_url, release_date_matches
+    from section02_news import KST, LAST_SLOT, LESSONS as NEWS_LESSONS, SOURCES, in_window, original_url, release_date_matches
 
 ROOT = Path(__file__).resolve().parents[1]
 TITLES = ['오늘의 시장 한눈에 보기', '오늘의 주요 이슈와 시장 흐름', '오늘의 경제 공부', '오늘의 복습 퀴즈']
@@ -139,7 +139,14 @@ def validate(doc, audience='public'):
                     or cutoff.astimezone(KST).date() != day
                     or cutoff > datetime.combine(day, LAST_SLOT, KST)):
                 raise ValueError('Invalid official news window')
-            if doc.get('firstPublishedAt') and cutoff > first:
+            if 'addedAt' in news:
+                added = datetime.fromisoformat(news['addedAt'])
+                initial = datetime.fromisoformat(news['firstCutoff'])
+                if (not doc.get('revision') or not doc.get('firstPublishedAt')
+                        or initial.tzinfo is None or added.tzinfo is None
+                        or not after < initial <= min(first, cutoff) or added < max(first, cutoff)):
+                    raise ValueError('Invalid official news revision time')
+            elif doc.get('firstPublishedAt') and cutoff > first:
                 raise ValueError('News cutoff exceeds first publication')
         if news['status'] == 'pending' and issues == [] and 'concept' not in news:
             return
@@ -274,6 +281,21 @@ def generate(doc, audience='public'):
     study = '<div class="reading-item reading-featured"><h3>' + esc(lesson['term']) + '</h3><p>' + esc(lesson['explanation']) + '</p><p>' + esc(lesson['example']) + '</p><a href="' + esc(lesson['source']) + '" target="_blank" rel="noopener noreferrer">개념 참고 자료 · Investor.gov ↗</a></div>'
     controls = ''.join('<label class="quiz-option"><input type="radio" name="answer" value="%d" required><span>%s</span></label>' % (i, esc(opt)) for i, opt in enumerate(lesson['options']))
     quiz = '<div class="quiz"><form id="market-quiz" class="market-quiz" data-answer="%d"><fieldset><legend>%s</legend>%s</fieldset><div class="quiz-controls"><button class="button" type="submit">정답 확인</button><button class="button-ghost" type="reset">다시 풀기</button></div><div id="quiz-feedback" class="quiz-feedback" role="status" aria-live="polite" data-explanation="%s" hidden></div></form></div>' % (lesson['answer'], esc(lesson['question']), controls, esc(lesson['why']))
+    questions = {
+        "policy": ("정책 결정을 비교할 때 무엇을 살펴볼까요?", "이전 회의와 이번 회의의 목표금리 범위를 비교합니다."),
+        "prices": ("물가의 전월비와 전년동월비를 읽을 때 먼저 확인할 점은?", "비교 기간과 계절조정 여부를 확인합니다."),
+        "jobs": ("실업률을 계산할 때 분모에 포함되는 사람은?", "취업자와 실업자를 합한 경제활동인구입니다."),
+    }
+    linked_issues = news['issues'] if news and 'outcomes' in news else []
+    for item in linked_issues:
+        topic = item['topic']
+        term, meaning, connection, _, _ = NEWS_LESSONS[topic]
+        study += (f'<div class="reading-item"><h3>{esc(term)}</h3><p>{esc(meaning)}</p>'
+                  f'<p>발표 사례 · {esc(item["fact"])}</p><p>{esc(connection)}</p>'
+                  f'<a href="{esc(item["source"])}">{esc(item["sourceName"])} 원문 ↗</a></div>')
+        question, answer = questions[topic]
+        quiz += (f'<div class="reading-item"><h3>{esc(question)}</h3><details>'
+                 f'<summary>정답과 해설 보기</summary><p>{esc(answer)} {esc(connection)}</p></details></div>')
     sections = ''.join('<section><div class="eyebrow">SECTION %02d</div><h2>%s</h2>%s</section>' % (i + 1, TITLES[i], body) for i, body in enumerate([overview, issues, study, quiz]))
     note = '공개 학습판 · 확인되지 않은 시세를 포함하지 않습니다. 실시간 시세가 아닙니다.'
     if doc.get('edition') == 'archive-study':
@@ -284,6 +306,11 @@ def generate(doc, audience='public'):
 
 def render_official_news(news):
     if news['status'] == 'pending':
+        outcomes = set(news.get('outcomes', {}).values())
+        if outcomes & {'timeout', 'error'}:
+            return '<p class="report-status">확인 대기 · 일부 공식 출처의 조회가 지연되거나 실패했습니다.</p>'
+        if 'duplicate' in outcomes:
+            return '<p class="report-status">확인 대기 · 이미 반영한 발표를 제외했습니다.</p>'
         return '<p class="report-status">확인 대기 · 이번 리포트의 확인 기간에 검증된 공식 발표가 없습니다.</p>'
     cards = []
     for item in news['issues']:
@@ -306,7 +333,7 @@ def insert_usage_notice(page):
     notice = '<aside class="container usage-notice" id="usage-notice" aria-label="자료 이용 안내"><p>' + esc(USAGE_NOTICE) + '</p></aside>'
     return page.replace('<footer>', '<footer>' + notice, 1)
 
-def build(root, day, backfill=False, market=None, *, write_dashboard=True, section02=None):
+def build(root, day, backfill=False, market=None, *, write_dashboard=True, section02=None, news_revision=None):
     folder = root / 'content/daily'
     manuscript = folder / (day.isoformat() + '.json')
     original_target = root / 'reports/daily' / (day.isoformat() + '.html')
@@ -340,6 +367,16 @@ def build(root, day, backfill=False, market=None, *, write_dashboard=True, secti
                 target_doc, new_revision = enriched, True
         else:
             target_doc = enriched
+    if news_revision is not None:
+        if market is not None or not manuscript.exists():
+            raise ValueError('News revision requires a published manuscript')
+        number = current.get('revision', 0) + 1
+        if number > 999:
+            raise ValueError('Revision limit reached')
+        target_doc = dict(current, revision=number, section02=news_revision)
+        validate(target_doc)
+        destination = folder / f'{day}-r{number:03d}.json'
+        new_revision = True
     target = root / 'reports/daily' / (destination.stem + '.html')
     if variants and not new_revision:
         destination, target = variants[-1], root / 'reports/daily' / (variants[-1].stem + '.html')

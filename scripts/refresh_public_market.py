@@ -80,6 +80,11 @@ def prepare_section02(root, day, cutoff):
             if prior is None:
                 continue
             news = prior.get('section02', {})
+            if report_day == day:
+                # A retry keeps the first edition's lower boundary.
+                frozen_after = news.get('window', {}).get('after')
+                if frozen_after:
+                    after = datetime.fromisoformat(frozen_after)
             seen.update(item['source'] for item in news.get('issues', []))
             if after is None and report_day < day:
                 # Existing reports have no news cutoff. Use their last scheduled slot.
@@ -99,9 +104,34 @@ def prepare_section02(root, day, cutoff):
         if news.get('window') != window or any(item['source'] in seen for item in news['issues']):
             raise ValueError('Official news does not match the publication window or history')
         return news
-    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError) as error:
+        pending["outcomes"] = {"collector": "timeout" if isinstance(error, subprocess.TimeoutExpired) else "error"}
         print(f"::warning::Official news unavailable for {day}; continuing daily study")
         return pending
+
+
+def supplement_news(root, day, cutoff, now, news):
+    current = dated_study(root, day)
+    previous = (current or {}).get("section02", {})
+    window = previous.get("window", {})
+    if ("outcomes" not in previous or not window or len(previous["issues"]) >= 2
+            or cutoff < datetime.fromisoformat(window["through"])):
+        return False
+    received = news(root, day, cutoff)
+    existing = previous["issues"]
+    topics = {item["topic"] for item in existing}
+    urls = {item["source"] for item in existing}
+    additions = [item for item in received["issues"]
+                 if item["topic"] not in topics and item["source"] not in urls][:2 - len(existing)]
+    if not additions:
+        print(f"Official news {day}: {received.get('outcomes', {})}; added=0")
+        return False
+    merged = dict(received, issues=existing + additions,
+                  concept=previous.get("concept") or received["concept"],
+                  firstCutoff=previous.get("firstCutoff", window["through"]),
+                  addedAt=now.isoformat())
+    build(root, day, write_dashboard=False, news_revision=merged)
+    return True
 
 
 def revise_dated_study(root, session_day, region, result, recorded_at=None):
@@ -334,6 +364,10 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
     current_revised = False
     if region == "kr" and not built:
         current_revised = revise_dated_study(root, day, region, result, now)
+        if news and completed_session and not recover:
+            cutoff = min(local_now, datetime.combine(day, news_slot, KST))
+            added = supplement_news(root, day, cutoff, now, news)
+            current_revised = current_revised or added
         revisions += int(current_revised)
     if region == "us":
         # U.S. trading date is one day earlier in KST, or older after holidays.
