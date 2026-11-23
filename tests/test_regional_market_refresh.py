@@ -677,7 +677,7 @@ class RegionalRefreshTests(unittest.TestCase):
             git(kr, "config", "user.name", "Fixture")
             git(kr, "config", "user.email", "fixture@example.invalid")
             (kr / "scripts").mkdir()
-            for name in ("build_public_reports.py", "section02_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
+            for name in ("build_public_reports.py", "section02_news.py", "reviewed_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
                 shutil.copy(ROOT / "scripts" / name, kr / "scripts")
             shutil.copy(ROOT / "scripts/refresh_public_market.py", kr / "scripts/refresh_impl.py")
             (kr / "scripts/refresh_public_market.py").write_text(
@@ -730,7 +730,7 @@ class RegionalRefreshTests(unittest.TestCase):
             git(repo, "config", "user.email", "fixture@example.invalid")
             build(repo, DAY)
             (repo / "scripts").mkdir()
-            for name in ("build_public_reports.py", "section02_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
+            for name in ("build_public_reports.py", "section02_news.py", "reviewed_news.py", "market_close.py", "market_sources.py", "collect_close.py"):
                 shutil.copy(ROOT / "scripts" / name, repo / "scripts")
             shutil.copy(ROOT / "scripts/refresh_public_market.py", repo / "scripts/refresh_impl.py")
             (repo / "scripts/refresh_public_market.py").write_text(
