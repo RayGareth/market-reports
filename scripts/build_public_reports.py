@@ -13,8 +13,10 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 try:
+    from . import reviewed_news
     from .section02_news import KST, LAST_SLOT, LESSONS as NEWS_LESSONS, SOURCES, in_window, original_url, release_date_matches
 except ImportError:
+    import reviewed_news
     from section02_news import KST, LAST_SLOT, LESSONS as NEWS_LESSONS, SOURCES, in_window, original_url, release_date_matches
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -152,11 +154,17 @@ def validate(doc, audience='public'):
             return
         if (news['status'] != 'ready' or 'window' not in news or not 1 <= len(issues) <= 2
                 or len({item['topic'] for item in issues}) != len(issues)
-                or len({item['source'] for item in issues}) != len(issues)):
+                or len({item['source'] for item in issues}) != len(issues)
+                or len({item['eventId'] for item in issues if 'eventId' in item})
+                != sum('eventId' in item for item in issues)):
             raise ValueError('Invalid official news selection')
         for item in issues:
             published = datetime.fromisoformat(item['publishedAt'])
             topic, url = item['topic'], item['source']
+            if 'eventId' in item:
+                if not in_window(published, after, cutoff) or not reviewed_news.editorial_article(item):
+                    raise ValueError('Article needs dated and attributed facts')
+                continue
             if (not in_window(published, after, cutoff)
                     or not approved(item) or topic not in SOURCES
                     or original_url(topic, url) != url or item['sourceName'] != SOURCES[topic][1]
@@ -286,10 +294,11 @@ def generate(doc, audience='public'):
         "prices": ("물가의 전월비와 전년동월비를 읽을 때 먼저 확인할 점은?", "비교 기간과 계절조정 여부를 확인합니다."),
         "jobs": ("실업률을 계산할 때 분모에 포함되는 사람은?", "취업자와 실업자를 합한 경제활동인구입니다."),
     }
+    questions.update(reviewed_news.QUESTIONS)
     linked_issues = news['issues'] if news and 'outcomes' in news else []
     for item in linked_issues:
         topic = item['topic']
-        term, meaning, connection, _, _ = NEWS_LESSONS[topic]
+        term, meaning, connection, _, _ = (NEWS_LESSONS | reviewed_news.LESSONS)[topic]
         study += (f'<div class="reading-item"><h3>{esc(term)}</h3><p>{esc(meaning)}</p>'
                   f'<p>발표 사례 · {esc(item["fact"])}</p><p>{esc(connection)}</p>'
                   f'<a href="{esc(item["source"])}">{esc(item["sourceName"])} 원문 ↗</a></div>')
@@ -308,18 +317,26 @@ def render_official_news(news):
     if news['status'] == 'pending':
         outcomes = set(news.get('outcomes', {}).values())
         if outcomes & {'timeout', 'error'}:
-            return '<p class="report-status">확인 대기 · 일부 공식 출처의 조회가 지연되거나 실패했습니다.</p>'
+            return '<p class="report-status">확인 대기 · 일부 뉴스 출처의 조회가 지연되거나 실패했습니다.</p>'
+        if outcomes & {'source_unavailable', 'validation_failed'}:
+            return '<p class="report-status">확인 대기 · 기사 원문 또는 사실 검증을 완료하지 못했습니다.</p>'
         if 'duplicate' in outcomes:
-            return '<p class="report-status">확인 대기 · 이미 반영한 발표를 제외했습니다.</p>'
-        return '<p class="report-status">확인 대기 · 이번 리포트의 확인 기간에 검증된 공식 발표가 없습니다.</p>'
+            return '<p class="report-status">확인 대기 · 이미 반영한 소식을 제외했습니다.</p>'
+        if 'outside_window' in outcomes:
+            return '<p class="report-status">확인 대기 · 확인 기간 밖의 보도를 제외했습니다.</p>'
+        return '<p class="report-status">확인 대기 · 이번 리포트의 확인 기간에 검증된 뉴스가 없습니다.</p>'
     cards = []
     for item in news['issues']:
         published = datetime.fromisoformat(item['publishedAt']).astimezone(KST)
         details = ''.join('<b class="fact-label">' + label + '</b><p>' + esc(item[key]) + '</p>'
                           for label, key in [('확인된 사실', 'fact'), ('시장과 연결해 보기', 'interpretation'),
                                              ('공부 포인트', 'study')])
+        observed = ''
+        if 'observedAt' in item:
+            at = datetime.fromisoformat(item['observedAt']).astimezone(KST)
+            observed = f'<p>내용 기준 시각 · {at:%Y-%m-%d %H:%M} KST</p>'
         cards.append(f'<div class="reading-item"><h3>{esc(item["title"])}</h3>'
-                     f'<p>{published:%Y-%m-%d %H:%M} KST · {esc(item["sourceName"])}</p>{details}'
+                     f'<p>{published:%Y-%m-%d %H:%M} KST · {esc(item["sourceName"])}</p>{observed}{details}'
                      f'<a href="{esc(item["source"])}" target="_blank" rel="noopener noreferrer">원문 읽기 ↗</a></div>')
     concept = news['concept']
     paragraphs = ''.join(f'<p>{esc(concept[key])}</p>' for key in ('meaning', 'connection', 'application'))

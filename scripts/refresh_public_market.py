@@ -86,6 +86,8 @@ def prepare_section02(root, day, cutoff):
                 if frozen_after:
                     after = datetime.fromisoformat(frozen_after)
             seen.update(item['source'] for item in news.get('issues', []))
+            seen.update(f"event:{item['eventId']}" for item in news.get('issues', [])
+                        if 'eventId' in item)
             if after is None and report_day < day:
                 # Existing reports have no news cutoff. Use their last scheduled slot.
                 through = news.get('window', {}).get('through')
@@ -121,8 +123,10 @@ def supplement_news(root, day, cutoff, now, news):
     existing = previous["issues"]
     topics = {item["topic"] for item in existing}
     urls = {item["source"] for item in existing}
+    events = {item["eventId"] for item in existing if "eventId" in item}
     additions = [item for item in received["issues"]
-                 if item["topic"] not in topics and item["source"] not in urls][:2 - len(existing)]
+                 if item["topic"] not in topics and item["source"] not in urls
+                 and item.get("eventId") not in events][:2 - len(existing)]
     if not additions:
         print(f"Official news {day}: {received.get('outcomes', {})}; added=0")
         return False

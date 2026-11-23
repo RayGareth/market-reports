@@ -147,11 +147,16 @@ class Section02Tests(unittest.TestCase):
             return {SOURCES["policy"][0]: rss, release_url: RELEASE,
                     SOURCES["prices"][0]: LATE_CPI, SOURCES["jobs"][0]: "<feed/>"}[url]
 
-        for close_first in (True, False):
-            with self.subTest(close_first=close_first), tempfile.TemporaryDirectory() as temp:
+        for close_first, article_first in ((True, False), (False, False), (True, True), (False, True)):
+            with self.subTest(close_first=close_first, article=article_first), tempfile.TemporaryDirectory() as temp:
                 root = Path(temp)
                 (root / "config").mkdir()
                 (root / "config/market-sources.json").write_text(json.dumps(configuration()))
+                reviewed = root / "config/reviewed-economic-news.json"
+                article = ReviewedArticleTests.article(
+                    1, "orders_exports", "2026-11-12T18:20:00+09:00")
+                if article_first:
+                    reviewed.write_text(json.dumps([article]))
                 def run(at, verified, available):
                     def quotes(config, region, existing, now):
                         source = Source(day=DAY, previous=DAY-timedelta(days=1))
@@ -159,7 +164,9 @@ class Section02Tests(unittest.TestCase):
                                                                  previous=DAY-timedelta(days=1))
                         return prices(config, region, existing, now, {"yahoo": source, "naver": checker})
                     def news(root, day, cutoff):
-                        return collect(AFTER, cutoff, fetch=fetch if available else lambda url: "<feed/>")
+                        return collect(AFTER, cutoff,
+                                       fetch=fetch if available and not article_first else lambda url: "<rss><channel/></rss>",
+                                       reviewed_path=reviewed if available and article_first else None)
                     refresh(root, "kr", at, quotes, news=news, news_slot=at.time())
 
                 run(early, False, True)
@@ -174,7 +181,8 @@ class Section02Tests(unittest.TestCase):
                 self.assertTrue(all(row["verified"] for row in current["indices"]))
                 self.assertEqual(current["lesson"], json.loads(first)["lesson"])
                 self.assertEqual(current["section02"]["firstCutoff"], early.isoformat())
-                self.assertEqual([i["source"] for i in current["section02"]["issues"]], [release_url])
+                self.assertEqual([i["source"] for i in current["section02"]["issues"]],
+                                 [article["source"] if article_first else release_url])
                 self.assertEqual(original.read_bytes(), first)
                 self.assertEqual((root / f"reports/daily/{DAY}.html").read_bytes(), first_html)
                 page = (root / "reports/latest.html").read_text()
@@ -182,3 +190,69 @@ class Section02Tests(unittest.TestCase):
                 self.assertIn(current["lesson"]["question"], page)
                 run(late, True, True)
                 self.assertEqual(dated_study(root, DAY), current)
+
+
+class ReviewedArticleTests(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.path = self.root / "reviewed-economic-news.json"
+
+    @staticmethod
+    def article(number, topic, published, **fields):
+        return dict(
+            topic=topic, publishedAt=published, verified=True, region="kr",
+            source=f"https://n.news.naver.com/article/050/{number:010d}",
+            sourceName="한경비즈니스", eventId=f"synthetic-{number}",
+            title="테스트용 기사", fact="테스트용 확인 사실",
+            interpretation="테스트용 시장 해석", study="테스트용 공부 포인트",
+        ) | fields
+
+    def collect(self, rows, cutoff=CUTOFF, seen=()):
+        self.path.write_text(json.dumps(rows), encoding="utf-8")
+        return collect(AFTER, cutoff, seen=seen, fetch=feed, reviewed_path=self.path)
+
+    def test_domestic_priority_and_official_fallback(self):
+        domestic = self.article(1, "market_links", "2026-11-12T09:14:00+09:00",
+                                observedAt="2026-11-12T09:10:00+09:00")
+        exports = self.article(2, "orders_exports", "2026-11-12T14:08:00+09:00", priority=3)
+        foreign = self.article(3, "global_sentiment", "2026-11-12T08:00:00+09:00",
+                               region="overseas", priority=3)
+        self.assertEqual([row["topic"] for row in self.collect([domestic, exports, foreign])["issues"]],
+                         ["orders_exports", "market_links"])
+        self.assertEqual([row["topic"] for row in self.collect([exports])["issues"]],
+                         ["orders_exports", "policy"])
+        self.assertEqual([row["topic"] for row in self.collect([])["issues"]], ["policy"])
+
+    def test_time_validation_and_history(self):
+        article = self.article(1, "orders_exports", "2026-11-12T17:08:00+09:00")
+        self.assertEqual(self.collect([article], CUTOFF.replace(hour=17, minute=7))
+                         ["outcomes"]["reviewed_articles"], "outside_window")
+        self.assertEqual(self.collect([article], seen=["event:synthetic-1"])
+                         ["outcomes"]["reviewed_articles"], "duplicate")
+        invalid = dict(article, topic="market_links")
+        self.assertEqual(self.collect([invalid])["outcomes"]["reviewed_articles"], "validation_failed")
+        copied = dict(article, topic="global_sentiment", eventId="another-id")
+        self.assertEqual(len(self.collect([article, copied])["issues"]), 2)
+        self.assertEqual(sum("eventId" in item for item in self.collect([article, copied])["issues"]), 1)
+
+    def test_article_revision_keeps_original_and_existing_official_news(self):
+        from scripts.refresh_public_market import supplement_news
+
+        early = CUTOFF.replace(hour=17, minute=7)
+        now = CUTOFF.replace(minute=31)
+        build(self.root, DAY, section02=self.collect([], early),
+              market={"indices": [], "marketStatus": [], "firstPublishedAt": early.isoformat()})
+        path = self.root / f"content/daily/{DAY}.json"
+        original = path.read_bytes()
+        article = self.article(1, "market_links", "2026-11-12T17:08:00+09:00",
+                               observedAt="2026-11-12T09:10:00+09:00")
+        news = self.collect([article])
+        self.assertTrue(supplement_news(self.root, DAY, CUTOFF, now, lambda *_: news))
+        self.assertFalse(supplement_news(self.root, DAY, CUTOFF, now, lambda *_: news))
+        self.assertEqual(path.read_bytes(), original)
+        page = (self.root / "reports/latest.html").read_text()
+        for text in ("2026-11-12 17:08", "내용 기준 시각 · 2026-11-12 09:10", "정책금리",
+                     "국제 증시의 연결", "오전 등락률", json.loads(original)["lesson"]["question"]):
+            self.assertIn(text, page)

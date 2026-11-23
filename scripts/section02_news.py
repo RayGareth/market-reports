@@ -7,10 +7,16 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, time
 from email.utils import parsedate_to_datetime
 from fractions import Fraction
+from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from xml.etree import ElementTree
 from zoneinfo import ZoneInfo
+
+if __package__:
+    from . import reviewed_news
+else:
+    import reviewed_news
 
 KST = ZoneInfo("Asia/Seoul")
 ET = ZoneInfo("America/New_York")
@@ -175,7 +181,7 @@ def candidates(topic, after, cutoff, seen, fetch, outcomes):
     return []
 
 
-def collect(after, cutoff, seen=(), fetch=download):
+def collect(after, cutoff, seen=(), fetch=download, reviewed_path=None):
     window = {"after": after.isoformat(), "through": cutoff.isoformat()}
 
     outcomes = {}
@@ -192,12 +198,36 @@ def collect(after, cutoff, seen=(), fetch=download):
 
     # Dict order gives priority to a policy decision, then prices and jobs.
     with ThreadPoolExecutor(max_workers=len(SOURCES)) as pool:
-        issues = [item for batch in pool.map(read, SOURCES) for item in batch][:2]
+        official = [item for batch in pool.map(read, SOURCES) for item in batch]
+    articles, result = (reviewed_news.collect_reviewed(after, cutoff, seen, reviewed_path)
+                        if reviewed_path else ([], "no_candidate"))
+    issues, topics, events, urls = [], set(), set(), set()
+    domestic = [item for item in articles if item["region"] == "kr"]
+    overseas = [item for item in articles if item["region"] == "overseas"]
+    for item in domestic + overseas + official:
+        event = item.get("eventId")
+        if item["topic"] in topics or event in events or item["source"] in urls:
+            continue
+        issues.append(item)
+        topics.add(item["topic"])
+        urls.add(item["source"])
+        if event:
+            events.add(event)
+        if len(issues) == 2:
+            break
+    if reviewed_path:
+        outcomes["reviewed_articles"] = ("selected" if any("eventId" in item for item in issues)
+                                         else result)
     if not issues:
         return {"status": "pending", "issues": [], "window": window, "outcomes": outcomes}
-    concept = issues[0]["concept"]
+    first = issues[0]
+    concept = first.get("concept")
+    if concept is None:
+        term, meaning, connection, _, _ = reviewed_news.LESSONS[first["topic"]]
+        concept = {"term": term, "meaning": meaning, "connection": connection,
+                   "application": first["fact"]}
     for item in issues:
-        del item["concept"]
+        item.pop("concept", None)
     return {"status": "ready", "issues": issues, "concept": concept, "window": window, "outcomes": outcomes}
 
 
@@ -207,4 +237,6 @@ if __name__ == "__main__":
     parser.add_argument("through", type=datetime.fromisoformat)
     parser.add_argument("seen", nargs="*", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    print(json.dumps(collect(args.after, args.through, args.seen), ensure_ascii=True))
+    reviewed = Path(__file__).resolve().parents[1] / "config/reviewed-economic-news.json"
+    print(json.dumps(collect(args.after, args.through, args.seen, reviewed_path=reviewed),
+                     ensure_ascii=True))
