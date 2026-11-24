@@ -149,8 +149,8 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
             continue
         retained = None
         if region:
-            # The scheduled primary is always Yahoo. A checker may verify a
-            # close, but never becomes the fallback origin of the public row.
+            # Keep Yahoo as the canonical origin of a cross-checked public row.
+            # A separately approved Korean checker may provide a sole quote.
             primary, checker = PUBLIC_PAIRS[region]
             candidates = [(primary, config["providers"][primary])]
             retained = reusable_row(existing.get(instrument), instrument, target,
@@ -165,15 +165,15 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 # A changed exchange close time invalidates the cached session metadata.
                 retained = None
         good, errors = {}, []
-        collected_at = None
+        collected_at = {}
         for name, policy in config['providers'].items():
             if name not in adapters or policy.get('enabled') is not True or policy.get('collectionAllowed') is not True or instrument not in policy.get('instruments', []) or (audience == 'private' and not private_allowed(policy, instrument, now.date())):
                 continue
             diagnostic = 'valid session pair'
             try:
                 good[name] = checked_pair(fetch_pair(adapters[name], instrument, target, previous), target, previous)
-                if region in ('kr', 'us') and name == 'yahoo':
-                    collected_at = verified_clock().isoformat()
+                if (name == 'yahoo' and region in ('kr', 'us')) or (name == 'naver' and region == 'kr'):
+                    collected_at[name] = verified_clock().isoformat()
             except LookupError:
                 errors.append('missing')
                 diagnostic = 'required observation or response field missing'
@@ -187,13 +187,17 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 print(f'{instrument} {name} {target} / {previous}: {diagnostic}')
         failure = errors[0] if errors else 'missing'
         pending = None
+        if region == 'kr' and 'yahoo' not in good and 'naver' in good:
+            naver = config['providers']['naver']
+            if naver.get('publicProvisionalClose') is True:
+                candidates = [('naver', naver)]
         for primary, policy in candidates:
             if primary not in good:
                 continue
             a, prev_a, pct_a = good[primary]
             row = {'id':instrument, 'name':meta['name'], 'region':meta['region'], 'asOf':target.isoformat(), 'previousAsOf':previous.isoformat(), 'close':round(a,2), 'changePct':round(pct_a,2), 'source':policy['sourceUrls'][instrument], 'sourceName':policy.get('label', primary)}
             if region in ('kr', 'us'):
-                row.update(closeAt=state['expectedCloseAt'], collectedAt=collected_at)
+                row.update(closeAt=state['expectedCloseAt'], collectedAt=collected_at[primary])
                 cached = provisional.get(instrument, {})
                 if cached.get('collectedAt') and all(cached.get(key) == row[key] for key in (
                     'asOf', 'previousAsOf', 'closeAt', 'close', 'changePct', 'source'
@@ -204,8 +208,8 @@ def _collect(config, now, adapters, calendar, *, audience, allow_single_source=F
                 if not errors:
                     failure = 'verification_unavailable'
                 if ((region == 'us' and failure in ('missing', 'provider_error', 'invalid'))
-                        or (region == 'kr' and failure in ('missing', 'provider_error'))):
-                    # A valid completed Yahoo session can be shown while the independent checker is unavailable.
+                        or region == 'kr'):
+                    # The completed session pair has already passed validation for this source.
                     pending = dict(row, verified=False, validated=True, verificationStatus='pending')
                 continue
             try:

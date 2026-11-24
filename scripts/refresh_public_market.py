@@ -157,7 +157,7 @@ def revise_dated_study(root, session_day, region, result, recorded_at=None):
     return True
 
 
-def preserve_us_reviews(result, previous, verified):
+def preserve_source_disagreements(result, previous, verified):
     """A transient source failure cannot republish an already disputed quote."""
     reviews = {
         (state["id"], state.get("expectedAsOf")): state
@@ -199,7 +199,7 @@ def retry_dated_us_study(root, day, config, current, collect):
         # The existing calendar still selects and validates both sessions.
         cutoff = datetime.combine(session, time(23, 59), timezone.utc)
         result = collect(scoped, "us", existing=study.get("indices", []), now=cutoff)
-        preserve_us_reviews(result, study.get("marketStatus", []), {})
+        preserve_source_disagreements(result, study.get("marketStatus", []), {})
         return int(revise_dated_study(root, session, "us", result))
     return 0
 
@@ -232,6 +232,7 @@ def recover_missing_kr_study(root, now, config, collect, snapshot, news=None, sk
         result = collect(config, "kr", existing=current.get("indices", []) if current else (),
                          now=study_time)
         if current:
+            preserve_source_disagreements(result, current.get("marketStatus", []), {})
             return session if revise_dated_study(root, session, "kr", result, now) else None
         korean = [row for row in result["indices"] if row["region"] == "kr"
                   and row["asOf"] == session.isoformat()]
@@ -265,9 +266,16 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
                    if row["region"] == "us" and row.get("verified") is True}
     if region == "us":
         result = collect(config, region, existing=[*verified_us.values(), *existing], now=now)
-        preserve_us_reviews(result, snapshot.get("marketStatus", []), verified_us)
+        preserve_source_disagreements(result, snapshot.get("marketStatus", []), verified_us)
     else:
         result = collect(config, region, existing=existing, now=now)
+        previous = snapshot.get("marketStatus", [])
+        # The dashboard can advance to a newer session before an older study is recovered.
+        for target in {state.get("expectedAsOf") for state in result["marketStatus"]} - {None}:
+            current = dated_study(root, date.fromisoformat(target))
+            if current:
+                previous = previous + current.get("marketStatus", [])
+        preserve_source_disagreements(result, previous, {})
     updated = dict(snapshot)
     for field in ("indices", "marketStatus"):
         untouched = [row for row in snapshot.get(field, []) if row["region"] != region]

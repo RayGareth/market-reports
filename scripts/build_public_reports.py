@@ -56,7 +56,7 @@ def approved(item, audience='public'):
             and item.get('publication', {}).get('status') != 'private_only')
 
 def pending_public_close(item):
-    """Only completed Yahoo index observations may be shown before independent comparison."""
+    """Accept completed observations from the designated sources before comparison."""
     instruments = {
         'kospi': ('KOSPI', 'KS11', 'kr', 'Asia/Seoul'),
         'kosdaq': ('KOSDAQ', 'KQ11', 'kr', 'Asia/Seoul'),
@@ -68,8 +68,13 @@ def pending_public_close(item):
             or item.get('verified') is not False or item.get('validated') is not True
             or item.get('verificationStatus') != 'pending'
             or item.get('publication', {}).get('status') == 'private_only'
-            or item.get('source') != f'https://finance.yahoo.com/quote/%5E{instrument[1]}/history/'
             or any(item.get(key) for key in ('verificationSource', 'verificationSourceName', 'verifiedAt'))):
+        return False
+    yahoo = f'https://finance.yahoo.com/quote/%5E{instrument[1]}/history/'
+    naver = f'https://finance.naver.com/sise/sise_index_day.naver?code={instrument[0]}'
+    if item.get('source') != yahoo and not (
+        instrument[2] == 'kr' and item.get('source') == naver and item.get('sourceName') == '네이버 금융'
+    ):
         return False
     try:
         close = datetime.fromisoformat(item['closeAt'].replace('Z', '+00:00'))
@@ -260,7 +265,7 @@ def generate(doc, audience='public'):
         overview += '<p class="report-status">코스피·코스닥 종목 분포: 공개 가능한 검증 자료가 있을 때 표시합니다.</p>'
     for state in doc.get('marketStatus', []):
         if state['status'] != 'verified' and not (state['status'] == 'single_source' and any(x['id'] == state['id'] for x in doc.get('indices', []))):
-            overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(('확인 대기 · ' if state['status'] in {'missing', 'provider_error', 'verification_unavailable'} else '') + state['message']) + '</p>'
+            overview += '<p class="report-status">' + esc(state['name']) + ' · ' + esc(state.get('expectedAsOf', '')) + ' · ' + esc(('확인 대기 · ' if state['status'] in {'missing', 'provider_error', 'verification_unavailable', 'invalid'} else '') + state['message']) + '</p>'
     issues = ''
     for item in doc.get('issues', []):
         issues += '<div class="reading-item"><b class="fact-label">확인된 사실</b><p>' + esc(item['fact']) + '</p>'
