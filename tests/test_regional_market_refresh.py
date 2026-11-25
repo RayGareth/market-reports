@@ -929,7 +929,7 @@ class RegionalRefreshTests(unittest.TestCase):
 
             def partial(config, region, existing, now):
                 return collect(config, region, existing, now, {
-                    "yahoo": Source(missing=("kosdaq",)), "naver": Source(),
+                    "yahoo": Source(missing=("kosdaq",)), "naver": Source(missing=("kosdaq",)),
                 })
 
             refresh(root, "kr", now, partial)
