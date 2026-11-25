@@ -1,39 +1,39 @@
 {
-  "reportDate": "2026-11-23",
+  "reportDate": "2026-11-24",
   "indices": [
     {
       "id": "kospi",
       "name": "KOSPI",
       "region": "kr",
-      "asOf": "2026-11-23",
-      "previousAsOf": "2026-11-20",
-      "close": 4708.54,
-      "changePct": -3.31,
+      "asOf": "2026-11-24",
+      "previousAsOf": "2026-11-23",
+      "close": 5006.03,
+      "changePct": 6.32,
       "source": "https://finance.yahoo.com/quote/%5EKS11/history/",
       "sourceName": "Yahoo Finance",
-      "closeAt": "2026-11-23T06:30:00+00:00",
-      "collectedAt": "2026-11-24T06:25:27.486138+00:00",
+      "closeAt": "2026-11-24T06:30:00+00:00",
+      "collectedAt": "2026-11-25T05:02:50.030798+00:00",
       "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI",
       "verificationSourceName": "네이버 금융",
-      "verifiedAt": "2026-11-24T06:25:28.317383+00:00"
+      "verifiedAt": "2026-11-25T05:02:50.617907+00:00"
     },
     {
       "id": "kosdaq",
       "name": "KOSDAQ",
       "region": "kr",
-      "asOf": "2026-11-23",
-      "previousAsOf": "2026-11-20",
-      "close": 635.45,
-      "changePct": -1.58,
+      "asOf": "2026-11-24",
+      "previousAsOf": "2026-11-23",
+      "close": 665.88,
+      "changePct": 4.79,
       "source": "https://finance.yahoo.com/quote/%5EKQ11/history/",
       "sourceName": "Yahoo Finance",
-      "closeAt": "2026-11-23T06:30:00+00:00",
-      "collectedAt": "2026-11-24T06:25:28.433167+00:00",
+      "closeAt": "2026-11-24T06:30:00+00:00",
+      "collectedAt": "2026-11-25T05:02:50.786936+00:00",
       "verified": true,
       "verificationSource": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ",
       "verificationSourceName": "네이버 금융",
-      "verifiedAt": "2026-11-24T06:25:28.950327+00:00"
+      "verifiedAt": "2026-11-25T05:02:51.216359+00:00"
     },
     {
       "id": "sp500",
@@ -76,8 +76,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-23T06:30:00+00:00",
-      "expectedAsOf": "2026-11-23",
+      "expectedCloseAt": "2026-11-24T06:30:00+00:00",
+      "expectedAsOf": "2026-11-24",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -87,8 +87,8 @@
       "region": "kr",
       "collection": "complete",
       "crossCheck": "passed",
-      "expectedCloseAt": "2026-11-23T06:30:00+00:00",
-      "expectedAsOf": "2026-11-23",
+      "expectedCloseAt": "2026-11-24T06:30:00+00:00",
+      "expectedAsOf": "2026-11-24",
       "status": "verified",
       "message": "확정 종가 · 교차 검증 완료"
     },
@@ -117,7 +117,7 @@
       "verificationReason": "provider_error"
     }
   ],
-  "checkedAt": "2026-11-24T06:37:17.793046+00:00",
+  "checkedAt": "2026-11-25T05:02:47.631948+00:00",
   "lastVerifiedUs": [
     {
       "id": "nasdaq",
