@@ -24,6 +24,14 @@ REVISION_WINDOW = 7
 RAY_CLOSE_REQUEST = "국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘."
 
 
+def had_dated_korean_close(root, day):
+    folder = root / "content/daily"
+    manuscripts = [folder / f"{day}.json", *folder.glob(f"{day}-r*.json")]
+    return any(row["region"] == "kr" and row["asOf"] == str(day)
+               for manuscript in manuscripts if manuscript.is_file()
+               for row in json.loads(manuscript.read_text()).get("indices", []))
+
+
 def study_snapshot(snapshot, config, now):
     """A dated note only includes rows for the session expected at publication."""
     states = []
@@ -102,14 +110,6 @@ def prepare_section02(root, day, cutoff):
     except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError, AttributeError):
         print(f"::warning::Official news unavailable for {day}; continuing daily study")
         return pending
-
-
-def had_dated_korean_close(root, day):
-    folder = root / "content/daily"
-    manuscripts = [folder / f"{day}.json", *folder.glob(f"{day}-r*.json")]
-    return any(row["region"] == "kr" and row["asOf"] == str(day)
-               for manuscript in manuscripts if manuscript.is_file()
-               for row in json.loads(manuscript.read_text()).get("indices", []))
 
 
 def revise_dated_study(root, session_day, region, result, recorded_at=None):
