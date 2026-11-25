@@ -21,6 +21,7 @@
     },
     "naver": {
       "enabled": true,
+      "publicProvisionalClose": true,
       "collectionAllowed": true,
       "family": "naver",
       "instruments": [
