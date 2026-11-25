@@ -18,7 +18,9 @@ class PublicationCheckTests(unittest.TestCase):
         entry = {"date": day, "url": f"daily/{day}-r001.html"}
         archive = json.dumps([entry])
         title = f"<title>{day} | Market Daily</title>"
-        responses = {"index.json": archive, entry["url"]: title, "latest.html": title}
+        page = title + '<link href="../../assets/style.css">'
+        responses = {"index.json": archive, entry["url"]: page,
+                     "latest.html": title + '<link href="../assets/style.css">'}
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "reports").mkdir()
@@ -27,7 +29,20 @@ class PublicationCheckTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "manuscript missing"):
                 check(root, day, responses.__getitem__)
             (root / f"content/daily/{day}.json").write_text(json.dumps({"date": day}))
-            check(root, day, responses.__getitem__)
+            (root / "reports/daily").mkdir()
+            html = root / "reports" / entry["url"]
+            html.write_text(page)
+            doc = root / "content/daily" / (html.stem + ".json")
+            doc.write_text(json.dumps({"date": day, "indices": []}))
+            self.assertFalse(check(root, day, responses.__getitem__))
+            row = {"id": "kospi", "region": "kr", "asOf": day, "verified": True,
+                   "source": "https://example.invalid/fixture"}
+            doc.write_text(json.dumps({"date": day, "indices": [row]}))
+            self.assertTrue(check(root, day, responses.__getitem__))
+            with self.assertRaisesRegex(ValueError, "edition mismatch"):
+                check(root, day, (responses | {"latest.html": title + "old content"}).__getitem__)
+            doc.write_text(json.dumps({"date": day, "indices": [{**row, "asOf": "2026-11-18"}]}))
+            self.assertFalse(check(root, day, responses.__getitem__))
             for path, bad in (("latest.html", title.replace(day, "2026-11-18")),
                               ("index.json", "[]"), (entry["url"], "not a report")):
                 with self.subTest(path=path), self.assertRaises(ValueError):
