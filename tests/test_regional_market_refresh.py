@@ -412,7 +412,7 @@ class RegionalRefreshTests(unittest.TestCase):
                 self.assertEqual(actual_day, day)
                 self.assertEqual(actual_close.isoformat(), close)
 
-    def test_kr_provisional_requires_valid_yahoo_and_transient_checker_failure(self):
+    def test_kr_provisional_validates_each_source_and_requires_naver_public_opt_in(self):
         cfg = configuration()
         pending = collect(cfg, "kr", adapters={
             "yahoo": Source(), "naver": Source(missing=("kospi", "kosdaq")),
@@ -428,7 +428,7 @@ class RegionalRefreshTests(unittest.TestCase):
         row = pending["indices"][0]
         for changes in (
             {"region": "us"},
-            {"source": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSPI"},
+            {"source": "https://finance.naver.com/sise/sise_index_day.naver?code=KOSDAQ"},
             {"collectedAt": "2026-11-04T06:29:00+00:00"},
             {"collectedAt": "2026-11-04T23:00:00"},
             {"verificationSource": "https://finance.naver.com/"},
@@ -443,6 +443,19 @@ class RegionalRefreshTests(unittest.TestCase):
             "yahoo": Source(missing=("kospi", "kosdaq")), "naver": Source(),
         })
         self.assertEqual(missing_yahoo["indices"], [])
+        cfg["providers"]["naver"]["publicProvisionalClose"] = True
+        alternate = collect(cfg, "kr", adapters={
+            "yahoo": Source(missing=("kospi", "kosdaq")), "naver": Source(missing=("kosdaq",)),
+        })
+        self.assertEqual([row["id"] for row in alternate["indices"]], ["kospi"])
+        naver = alternate["indices"][0]
+        self.assertEqual(naver["sourceName"], "네이버 금융")
+        self.assertEqual(naver["collectedAt"], (MORNING + timedelta(seconds=2)).isoformat())
+        doc["indices"] = [naver]
+        self.assertIn("교차 검증 전", generate(doc))
+        doc["indices"] = [{**naver, "sourceName": "Yahoo Finance"}]
+        with self.assertRaises(ValueError):
+            generate(doc)
 
         class Invalid(Source):
             def fetch(self, instrument, target):
@@ -451,7 +464,13 @@ class RegionalRefreshTests(unittest.TestCase):
         invalid_checker = collect(cfg, "kr", adapters={
             "yahoo": Source(), "naver": Invalid(),
         })
-        self.assertEqual(invalid_checker["indices"], [])
+        self.assertTrue(all(row["sourceName"] == "Yahoo Finance" and not row["verified"]
+                            for row in invalid_checker["indices"]))
+        self.assertEqual(len(invalid_checker["indices"]), 2)
+        invalid_primary = collect(cfg, "kr", adapters={"yahoo": Invalid(), "naver": Source()})
+        self.assertEqual(len(invalid_primary["indices"]), 2)
+        self.assertTrue(all(row["sourceName"] == "네이버 금융" and not row["verified"]
+                            for row in invalid_primary["indices"]))
 
         class Disagree(Source):
             def fetch(self, instrument, target):
@@ -473,6 +492,41 @@ class RegionalRefreshTests(unittest.TestCase):
             revision = json.loads((root / f"content/daily/{DAY}-r001.json").read_text())
             self.assertFalse(revision["indices"])
             self.assertIn("재검토 중", (root / f"reports/daily/{DAY}-r001.html").read_text())
+
+    def test_kr_disagreement_stays_held_until_both_sources_agree(self):
+        from scripts.refresh_public_market import dated_study
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "config").mkdir()
+            cfg = configuration()
+            cfg["providers"]["naver"]["publicProvisionalClose"] = True
+            (root / "config/market-sources.json").write_text(json.dumps(cfg))
+            now = datetime.fromisoformat("2026-11-04T09:00:00+00:00")
+
+            def run(at, yahoo, naver):
+                def feeds(cfg, region, existing, now):
+                    return collect(cfg, region, existing, now, {"yahoo": yahoo, "naver": naver})
+
+                refresh(root, "kr", at, feeds)
+
+            class Disagree(Source):
+                def fetch(self, instrument, target):
+                    return [Bar(PREVIOUS.isoformat(), 100), Bar(DAY.isoformat(), 103)]
+
+            missing = Source(missing=("kospi", "kosdaq"))
+            run(now, missing, Source())
+            original = (root / f"content/daily/{DAY}.json").read_bytes()
+            run(now + timedelta(minutes=15), Source(), Disagree())
+            held = dated_study(root, DAY)
+            self.assertFalse(held["indices"])
+            run(now + timedelta(minutes=30), missing, Source())
+            self.assertEqual(dated_study(root, DAY), held)
+            run(now + timedelta(minutes=47), Source(), Source())
+            up_to_date = dated_study(root, DAY)
+            self.assertEqual(up_to_date["revision"], 2)
+            self.assertTrue(all(row["verified"] for row in up_to_date["indices"]))
+            self.assertEqual((root / f"content/daily/{DAY}.json").read_bytes(), original)
 
     def test_kr_first_publication_waits_for_same_day_verified_close(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -560,8 +614,7 @@ class RegionalRefreshTests(unittest.TestCase):
                     return [Bar("2026-11-10", 100), Bar("2026-11-11", 0)]
 
             def invalid_close(config, region, existing, now):
-                valid = Source(day=date(2026, 11, 11), previous=date(2026, 11, 10))
-                return collect(config, region, existing, now, {"yahoo": InvalidClose(), "naver": valid})
+                return collect(config, region, existing, now, {"yahoo": InvalidClose(), "naver": InvalidClose()})
 
             def news(root, day, cutoff):
                 self.assertEqual(day, date(2026, 11, 11))

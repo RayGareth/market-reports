@@ -57,7 +57,9 @@ def parse_naver(text):
     rows = json.loads(text)
     if not isinstance(rows, list):
         raise ObservationError('Unexpected provider response structure')
-    return [Bar(r['localTradedAt'][:10], number(r['closePrice'])) for r in rows]
+    return [Bar(r['localTradedAt'][:10], number(r['closePrice']),
+                number(r['fluctuationsRatio']) if r.get('fluctuationsRatio') is not None else None)
+            for r in rows]
 
 def parse_fsc(text, instrument):
     response = json.loads(text)['response']
