@@ -439,6 +439,7 @@ class RegionalRefreshTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     generate(doc)
 
+        cfg["providers"]["naver"]["publicProvisionalClose"] = False
         missing_yahoo = collect(cfg, "kr", adapters={
             "yahoo": Source(missing=("kospi", "kosdaq")), "naver": Source(),
         })
@@ -624,12 +625,13 @@ class RegionalRefreshTests(unittest.TestCase):
                                    "through": cutoff.isoformat()}}
 
             with redirect_stdout(io.StringIO()) as log:
-                with self.assertRaises(RuntimeError):
-                    refresh(repo, "kr", delayed, invalid_close)
+                refresh(repo, "kr", delayed, invalid_close)
             self.assertIn("kospi yahoo 2026-11-11 / 2026-11-10: Invalid price", log.getvalue())
-            self.assertIn("waiting_for_ray", log.getvalue())
+            self.assertIn("Korean closes: unavailable", log.getvalue())
             self.assertIn("국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘.", log.getvalue())
-            self.assertFalse(report.exists())
+            self.assertTrue(report.exists())
+            first = manuscript.read_bytes()
+            self.assertIn("국내 종가 확인 대기", report.read_text())
 
             def news(root, day, cutoff):
                 self.assertEqual(day, date(2026, 11, 11))
@@ -639,15 +641,16 @@ class RegionalRefreshTests(unittest.TestCase):
                                    "through": cutoff.isoformat()}}
             with redirect_stdout(io.StringIO()) as log:
                 refresh(repo, "kr", delayed, collect, news=news, news_slot=time(18, 15))
-            self.assertIn("late first manuscript; 19:00 KST target missed", log.getvalue())
-            doc = json.loads(manuscript.read_text())
+            self.assertIn("late domestic close manuscript; 19:00 KST target missed", log.getvalue())
+            doc = json.loads((repo / "content/daily/2026-11-11-r001.json").read_text())
             self.assertEqual(doc["firstPublishedAt"], delayed.isoformat())
             self.assertEqual({r["asOf"] for r in doc["indices"]}, {"2026-11-11"})
+            self.assertEqual(manuscript.read_bytes(), first)
             generated = (report.read_bytes(), manuscript.read_bytes())
             refresh(repo, "kr", delayed + timedelta(minutes=15), collect,
                     news=lambda *args: self.fail("Existing news must be preserved"))
             self.assertEqual((report.read_bytes(), manuscript.read_bytes()), generated)
-            self.assertEqual(list(report.parent.glob("2026-11-11-r*.html")), [])
+            self.assertEqual(len(list(report.parent.glob("2026-11-11-r*.html"))), 1)
             self.assertFalse((report.parent / "2026-11-12.html").exists())
             self.assertEqual(prior.read_bytes(), original)
 
@@ -829,22 +832,24 @@ class RegionalRefreshTests(unittest.TestCase):
                 target, previous, _ = session_close("XKRX", now, REVIEWED)
                 return collect(config, region, existing, now, {
                     "yahoo": Source(missing=("kospi", "kosdaq"), day=target, previous=previous),
-                    "naver": Source(day=target, previous=previous),
+                    "naver": Source(missing=("kospi", "kosdaq"), day=target, previous=previous),
                 })
 
             def news(root, day, cutoff):
                 self.assertEqual(day, date(2026, 11, 16))
-                self.assertEqual(cutoff.isoformat(), "2026-11-16T18:15:00+09:00")
+                self.assertEqual(cutoff.isoformat(), "2026-11-16T18:00:00+09:00")
                 return {"status": "pending", "issues": [],
                         "window": {"after": "2026-11-13T18:30:00+09:00",
                                    "through": cutoff.isoformat()}}
 
             with redirect_stdout(io.StringIO()) as log:
                 refresh(root, "kr", now, missing,
-                        news=lambda *args: self.fail("News must wait for first domestic close"),
+                        news=news,
                         news_slot=time(18))
-            self.assertIn("Publication 2026-11-16: waiting_for_ray", log.getvalue())
-            self.assertFalse((root / "content/daily/2026-11-16.json").exists())
+            self.assertIn("Publication 2026-11-16: created; Korean closes: unavailable", log.getvalue())
+            original_path = root / "content/daily/2026-11-16.json"
+            initial = original_path.read_bytes()
+            self.assertFalse(json.loads(initial)["indices"])
 
             def partial(config, region, existing, now):
                 target, previous, _ = session_close("XKRX", now, REVIEWED)
@@ -853,8 +858,8 @@ class RegionalRefreshTests(unittest.TestCase):
                     "naver": Source(missing=("kospi", "kosdaq"), day=target, previous=previous),
                 })
             refresh(root, "kr", now + timedelta(minutes=15), partial,
-                    news=news, news_slot=time(18, 15))
-            doc = json.loads((root / "content/daily/2026-11-16.json").read_text())
+                    news=lambda *args: self.fail("Existing news must be preserved"), news_slot=time(18, 15))
+            doc = json.loads((root / "content/daily/2026-11-16-r001.json").read_text())
             self.assertEqual([r["id"] for r in doc["indices"]], ["kospi"])
             self.assertEqual(doc["indices"][0]["verificationStatus"], "pending")
             page = root / "reports/daily/2026-11-16.html"
@@ -864,7 +869,7 @@ class RegionalRefreshTests(unittest.TestCase):
             refresh(root, "kr", now + timedelta(minutes=47), missing,
                     news=lambda *args: self.fail("Repeated run must not collect news"))
             self.assertEqual(page.read_bytes(), original)
-            self.assertFalse(list(page.parent.glob("*-r*.html")))
+            self.assertEqual(len(list(page.parent.glob("*-r*.html"))), 1)
 
             morning = datetime.fromisoformat("2026-11-16T22:40:00+00:00")
             for earlier in (10, 11, 12, 13):
@@ -872,7 +877,7 @@ class RegionalRefreshTests(unittest.TestCase):
                     configuration(), "kr", now=datetime.fromisoformat(f"2026-11-{earlier}T09:00:00+00:00")))
             refresh(root, "kr", morning, collect, recover=True,
                     news=lambda *args: self.fail("Supplement must preserve original news"))
-            revised = json.loads((root / "content/daily/2026-11-16-r001.json").read_text())
+            revised = json.loads((root / "content/daily/2026-11-16-r002.json").read_text())
             self.assertEqual(revised["section02"], doc["section02"])
             self.assertEqual(revised["lesson"], doc["lesson"])
             self.assertEqual(revised["firstPublishedAt"], doc["firstPublishedAt"])
@@ -881,7 +886,8 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertTrue(all(r["verified"] for r in revised["indices"]))
             self.assertEqual(page.read_bytes(), original)
             refresh(root, "kr", morning + timedelta(minutes=15), collect, recover=True)
-            self.assertEqual(len(list(page.parent.glob("2026-11-16-r*.html"))), 1)
+            self.assertEqual(len(list(page.parent.glob("2026-11-16-r*.html"))), 2)
+            self.assertEqual(original_path.read_bytes(), initial)
             self.assertEqual(len(json.loads((root / "reports/index.json").read_text())), 5)
 
     def test_morning_supplements_older_pending_report_without_replacing_latest(self):
@@ -944,7 +950,7 @@ class RegionalRefreshTests(unittest.TestCase):
                     refresh(root, "kr", now, collect)
 
 
-    def test_no_domestic_close_after_1900_fails_with_ray_request(self):
+    def test_no_domestic_close_after_1900_publishes_study_with_ray_request(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             (root / "config").mkdir()
@@ -956,8 +962,45 @@ class RegionalRefreshTests(unittest.TestCase):
                     key: Source(missing=("kospi", "kosdaq"), day=target, previous=previous)
                     for key in ("yahoo", "naver")})
             with redirect_stdout(io.StringIO()) as log:
-                with self.assertRaisesRegex(RuntimeError, "19:00 KST publication target missed"):
-                    refresh(root, "kr", now, missing)
+                refresh(root, "kr", now, missing)
             self.assertIn("국내 종가가 확보되지 않아서, Ray가 직접 확인해서 알려줘.", log.getvalue())
-            self.assertFalse((root / "reports/daily/2026-11-16.html").exists())
-            self.assertFalse((root / "content/daily/2026-11-16.json").exists())
+            self.assertIn("19:00 KST domestic close publication target missed", log.getvalue())
+            self.assertTrue((root / "reports/daily/2026-11-16.html").exists())
+            self.assertFalse(json.loads((root / "content/daily/2026-11-16.json").read_text())["indices"])
+
+    def test_each_single_source_publishes_then_cross_checks(self):
+        from scripts.refresh_public_market import dated_study
+        for source in ("naver", "yahoo"):
+            with self.subTest(source=source), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                (root / "config").mkdir()
+                cfg = configuration()
+                self.assertTrue(cfg["providers"]["naver"]["publicProvisionalClose"])
+                (root / "config/market-sources.json").write_text(json.dumps(cfg))
+                at = datetime.fromisoformat("2026-11-04T08:07:00+00:00")
+
+                def single(config, region, existing, now):
+                    return collect(config, region, existing, now, {
+                        key: Source(missing=("kosdaq",) if key == source else ("kospi", "kosdaq"))
+                        for key in ("naver", "yahoo")
+                    })
+
+                refresh(root, "kr", at, single, news_slot=time(17, 7))
+                original_json = root / f"content/daily/{DAY}.json"
+                original_html = root / f"reports/daily/{DAY}.html"
+                original = original_json.read_bytes(), original_html.read_bytes()
+                doc = json.loads(original[0])
+                self.assertEqual([row["id"] for row in doc["indices"]], ["kospi"])
+                self.assertEqual(doc["indices"][0]["source"], cfg["providers"][source]["sourceUrls"]["kospi"])
+                self.assertEqual(doc["indices"][0]["verificationStatus"], "pending")
+                self.assertIn("교차 검증 전", original_html.read_text())
+                self.assertIn("KOSDAQ", original_html.read_text())
+                self.assertIn("확인 대기", original_html.read_text())
+                refresh(root, "kr", at + timedelta(hours=1), collect)
+                revised = dated_study(root, DAY)
+                self.assertEqual(revised["revision"], 1)
+                self.assertEqual(revised["lesson"], doc["lesson"])
+                self.assertTrue(all(row["verified"] for row in revised["indices"]))
+                self.assertEqual(len(revised["indices"]), 2)
+                self.assertEqual((original_json.read_bytes(), original_html.read_bytes()), original)
+                self.assertIn("교차 검증 완료", (root / f"reports/daily/{DAY}-r001.html").read_text())

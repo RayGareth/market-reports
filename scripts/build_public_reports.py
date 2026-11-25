@@ -195,6 +195,10 @@ def generate(doc, audience='public'):
     if doc.get('firstPublishedAt'):
         first = datetime.fromisoformat(doc['firstPublishedAt']).astimezone(KST)
         overview += f'<p class="report-status">최초 발행 {first:%Y-%m-%d %H:%M} KST</p>'
+    if doc.get('firstPublishedAt') and not any(
+        row['region'] == 'kr' and row['asOf'] == day for row in doc.get('indices', [])
+    ):
+        overview += '<p class="report-status">학습판 먼저 공개 · 국내 종가 확인 대기</p>'
     if doc.get('closeSupplementedAt'):
         recorded = datetime.fromisoformat(doc['closeSupplementedAt']).astimezone(KST)
         overview += f'<p class="report-status">종가 사후 보완 {recorded:%Y-%m-%d %H:%M} KST · 최초 발행본을 보존합니다.</p>'
