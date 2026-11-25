@@ -1,10 +1,12 @@
+import io
 import json
+from contextlib import redirect_stdout
 import tempfile
 import unittest
 from datetime import date, datetime, time
 from pathlib import Path
 
-from scripts.check_publication import check, target_date
+from scripts.check_publication import check, report_pending, target_date
 from scripts.section02_news import EVENING_SLOTS, KST
 
 
@@ -47,3 +49,13 @@ class PublicationCheckTests(unittest.TestCase):
                               ("index.json", "[]"), (entry["url"], "not a report")):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     check(root, day, (responses | {path: bad}).__getitem__)
+
+    def test_pending_observation_does_not_report_deadline_success_or_system_failure(self):
+        day = date(2026, 11, 19)
+        for at, expected in ((time(18, 50), "19:00 outcome pending"),
+                             (time(19, 5), "not confirmed at observation")):
+            with self.subTest(at=at), redirect_stdout(io.StringIO()) as log:
+                report_pending(day, datetime.combine(day, at, KST), "domestic closing prices unavailable")
+                self.assertIn("::warning::", log.getvalue())
+                self.assertIn(expected, log.getvalue())
+                self.assertNotIn("confirmed by 19:00", log.getvalue())

@@ -28,10 +28,14 @@ def download(path):
         return response.read().decode("utf-8")
 
 
+class PublicationPending(ValueError):
+    """The requested edition is not yet present at the observation time."""
+
+
 def check(root, day, fetch):
     manuscript = root / "content/daily" / f"{day}.json"
     if not manuscript.exists():
-        raise ValueError("main: first manuscript missing")
+        raise PublicationPending("main: first manuscript missing")
     if json.loads(manuscript.read_text())["date"] != day:
         raise ValueError("main: manuscript date mismatch")
     local = json.loads((root / "reports/index.json").read_text())
@@ -39,8 +43,10 @@ def check(root, day, fetch):
         raise ValueError("main: archive entry missing")
     public = json.loads(fetch("index.json"))
     entry = next((item for item in public if item["date"] == day), None)
-    if not entry or not re.fullmatch(rf"daily/{day}(?:-r[0-9]+)?\.html", entry["url"]):
-        raise ValueError("Pages: dated archive entry missing or invalid")
+    if not entry:
+        raise PublicationPending("Pages: dated archive entry missing")
+    if not re.fullmatch(rf"daily/{day}(?:-r[0-9]+)?\.html", entry["url"]):
+        raise ValueError("Pages: invalid dated archive link")
     # Read the exact edition referenced by the public archive. A learning-only
     # first edition may be visible while a close-bearing revision is still deploying.
     html = root / "reports" / entry["url"]
@@ -78,15 +84,26 @@ def main():
         return
     try:
         has_close = check(ROOT, day.isoformat(), download)
+    except PublicationPending as pending:
+        observed = datetime.now(KST)
+        report_pending(day, observed, str(pending))
+        return
     except (HTTPError, URLError, TimeoutError) as error:
         raise SystemExit(f"{day}: public HTTP check failed: {error}") from error
     observed = datetime.now(KST)
+    if not has_close:
+        report_pending(day, observed, "public study visible; domestic closing prices unavailable")
+        return
     timing = ("confirmed by 19:00" if observed <= datetime.combine(day, time(19), KST)
               else "checked after deadline; first public time unknown")
-    print(f"{day}: publicly visible at {observed.isoformat()}; {timing}")
-    if not has_close:
-        raise SystemExit(f"{day}: public study confirmed, but domestic closing prices are unavailable")
-    print(f"{day}: actual public report contains a domestic close; {timing}")
+    print(f"{day}: actual public report contains a domestic close; publicly visible at {observed.isoformat()}; {timing}")
+
+
+def report_pending(day, observed, reason):
+    timing = ("before deadline; 19:00 outcome pending"
+              if observed < datetime.combine(day, time(19), KST)
+              else "at or after deadline; domestic close publication not confirmed at observation")
+    print(f"::warning::{day}: {reason}; observed at {observed.isoformat()}; {timing}")
 
 
 if __name__ == "__main__":
