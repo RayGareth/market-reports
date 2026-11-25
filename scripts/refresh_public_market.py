@@ -104,6 +104,14 @@ def prepare_section02(root, day, cutoff):
         return pending
 
 
+def had_dated_korean_close(root, day):
+    folder = root / "content/daily"
+    manuscripts = [folder / f"{day}.json", *folder.glob(f"{day}-r*.json")]
+    return any(row["region"] == "kr" and row["asOf"] == str(day)
+               for manuscript in manuscripts if manuscript.is_file()
+               for row in json.loads(manuscript.read_text()).get("indices", []))
+
+
 def revise_dated_study(root, session_day, region, result, recorded_at=None):
     """Append changed closes or a review notice, preserving all previous editions."""
     current = dated_study(root, session_day)
@@ -153,13 +161,15 @@ def revise_dated_study(root, session_day, region, result, recorded_at=None):
     market = {"indices": rows, "marketStatus": states}
     if current.get("firstPublishedAt"):
         market["closeSupplementedAt"] = (recorded_at or datetime.now(timezone.utc)).isoformat()
+    late_first_close = (
+        region == "kr" and recorded_at is not None
+        and recorded_at > datetime.combine(session_day, time(19), KST)
+        and any(row["region"] == "kr" and row["asOf"] == target for row in rows)
+        and not had_dated_korean_close(root, session_day)
+    )
     build(root, session_day, market=market, write_dashboard=False)
-    if region == "kr" and recorded_at is not None:
-        had_close = any(row["region"] == "kr" and row["asOf"] == target
-                        for row in current.get("indices", []))
-        has_close = any(row["region"] == "kr" and row["asOf"] == target for row in rows)
-        if not had_close and has_close and recorded_at > datetime.combine(session_day, time(19), KST):
-            print(f"::warning::{session_day}: late domestic close manuscript; 19:00 KST target missed")
+    if late_first_close:
+        print(f"::warning::{session_day}: late domestic close manuscript; 19:00 KST target missed")
     return True
 
 
@@ -376,7 +386,8 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
         ready = {row["id"] for row in domestic if row.get("verified") is True} == {"kospi", "kosdaq"}
         if not domestic:
             print(f"::warning::{day}: {RAY_CLOSE_REQUEST}")
-            if local_now >= datetime.combine(day, time(19), KST):
+            if (local_now >= datetime.combine(day, time(19), KST)
+                    and not had_dated_korean_close(root, day)):
                 print(f"::warning::{day}: 19:00 KST domestic close publication target missed")
         close_status = "verified" if ready else "pending" if domestic else "unavailable"
         print(f"Publication {day}: {status}; Korean closes: {close_status}")

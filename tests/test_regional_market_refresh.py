@@ -523,7 +523,9 @@ class RegionalRefreshTests(unittest.TestCase):
             self.assertFalse(held["indices"])
             run(now + timedelta(minutes=30), missing, Source())
             self.assertEqual(dated_study(root, DAY), held)
-            run(now + timedelta(minutes=47), Source(), Source())
+            with redirect_stdout(io.StringIO()) as log:
+                run(now + timedelta(hours=2), Source(), Source())
+            self.assertNotIn("late domestic close manuscript", log.getvalue())
             up_to_date = dated_study(root, DAY)
             self.assertEqual(up_to_date["revision"], 2)
             self.assertTrue(all(row["verified"] for row in up_to_date["indices"]))
