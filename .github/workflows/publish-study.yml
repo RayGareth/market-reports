@@ -1,6 +1,7 @@
 name: Public Daily Study at 18 KST
 on:
   schedule:
+    - cron: '7 8 * * 1-5' # 17:07 KST first attempt
     - cron: '0 9 * * 1-5'
     - cron: '15 9 * * 1-5'
     - cron: '30 9 * * 1-5'

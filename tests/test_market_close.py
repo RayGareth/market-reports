@@ -86,7 +86,7 @@ class CloseTests(unittest.TestCase):
 
     def test_provider_parsers_with_only_synthetic_data(self):
         self.assertEqual(parse_fred('observation_date,SP500\n2026-10-23,100\n2026-10-26,.\n','sp500'),[Bar('2026-10-23',100)])
-        self.assertEqual(parse_naver('[{"localTradedAt":"2026-10-23","closePrice":"1,000"}]')[0].close,1000)
+        self.assertEqual(parse_naver('[{"localTradedAt":"2026-10-23","closePrice":"1,000","fluctuationsRatio":"-0.5"}]')[0], Bar("2026-10-23",1000,-0.5))
         text=json.dumps({'response':{'header':{'resultCode':'00'},'body':{'items':{'item':[{'idxNm':'코스피','basDt':'20261023','clpr':'100','hipr':'101','lopr':'99','fltRt':'1'}]}}}})
         self.assertEqual(parse_fsc(text,'kospi')[0],Bar('2026-10-23',100,1))
         with patch.dict('os.environ',{'FSC_API_KEY':'TEST_ONLY'},clear=False):

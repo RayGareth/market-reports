@@ -21,7 +21,7 @@ else:
 KST = ZoneInfo("Asia/Seoul")
 ET = ZoneInfo("America/New_York")
 LAST_SLOT = time(18, 30)
-EVENING_SLOTS = {"0 9 * * 1-5": time(18), "15 9 * * 1-5": time(18, 15), "30 9 * * 1-5": LAST_SLOT}
+EVENING_SLOTS = {"7 8 * * 1-5": time(17, 7), "0 9 * * 1-5": time(18), "15 9 * * 1-5": time(18, 15), "30 9 * * 1-5": LAST_SLOT}
 SOURCES = {
     "policy": ("https://www.federalreserve.gov/feeds/press_monetary.xml", "미국 연방준비제도",
                r"/newsevents/pressreleases/monetary\d{8}a\.htm"),
