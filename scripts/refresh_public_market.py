@@ -432,10 +432,28 @@ def refresh(root, region, now=None, collect=collect_region, recover=False, news=
     print(f"Refreshed public {region.upper()} market status; study created: {built}; revisions: {revisions}")
 
 
+def refresh_dated_news(root, day, now=None):
+    """Append news to a published edition without collecting market data."""
+    now = now or datetime.now(timezone.utc)
+    cutoff = datetime.combine(day, LAST_SLOT, KST)
+    if cutoff > now:
+        raise ValueError(f"News window for {day} has not closed")
+    current = dated_study(root, day)
+    if current is None:
+        raise ValueError(f"Publish the daily study for {day} before adding a news revision")
+    if not supplement_news(root, day, cutoff, now, prepare_section02):
+        print(f"No new eligible news for {day}; existing editions retained")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--region", required=True, choices=("kr", "us"))
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--region", choices=("kr", "us"))
+    mode.add_argument("--news-date", type=date.fromisoformat)
     parser.add_argument("--recover", action="store_true")
     args = parser.parse_args()
-    refresh(ROOT, args.region, recover=args.recover, news=prepare_section02 if args.region == 'kr' else None,
-            news_slot=EVENING_SLOTS.get(os.environ.get('MARKET_NEWS_SCHEDULE'), LAST_SLOT))
+    if args.news_date is not None:
+        refresh_dated_news(ROOT, args.news_date)
+    else:
+        refresh(ROOT, args.region, recover=args.recover, news=prepare_section02 if args.region == 'kr' else None,
+                news_slot=EVENING_SLOTS.get(os.environ.get('MARKET_NEWS_SCHEDULE'), LAST_SLOT))

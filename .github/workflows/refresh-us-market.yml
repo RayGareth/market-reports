@@ -33,6 +33,7 @@ jobs:
     if: vars.MARKET_PAGES_DEPLOY == 'true'
     needs: refresh
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write

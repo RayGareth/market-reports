@@ -4,7 +4,7 @@ import html
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from email.utils import parsedate_to_datetime
 from fractions import Fraction
 from pathlib import Path
@@ -22,6 +22,7 @@ KST = ZoneInfo("Asia/Seoul")
 ET = ZoneInfo("America/New_York")
 LAST_SLOT = time(18, 30)
 EVENING_SLOTS = {"7 8 * * 1-5": time(17, 7), "0 9 * * 1-5": time(18), "15 9 * * 1-5": time(18, 15), "30 9 * * 1-5": LAST_SLOT}
+BOK_FEED = "https://www.bok.or.kr/portal/bbs/B0000552/news.rss?menuNo=200690"
 SOURCES = {
     "policy": ("https://www.federalreserve.gov/feeds/press_monetary.xml", "미국 연방준비제도",
                r"/newsevents/pressreleases/monetary\d{8}a\.htm"),
@@ -127,15 +128,46 @@ def in_window(published, after, cutoff):
     return published.tzinfo is not None and after < published <= cutoff
 
 
-def candidates(topic, after, cutoff, seen, fetch, outcomes):
-    outcomes[topic] = "no_candidate"
-    feed_url, publisher, _ = SOURCES[topic]
-    raw = fetch(feed_url)
+def parse_feed(raw):
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", raw, re.I):
         raise ValueError("Invalid feed")
     feed = ElementTree.fromstring(raw)
     if feed.tag.rsplit("}", 1)[-1] not in {"rss", "feed"}:
         raise ValueError("Invalid feed")
+    return feed
+
+
+def domestic_release_candidates(after, cutoff, fetch=download):
+    """Return official source metadata for editorial review."""
+    feed = parse_feed(fetch(BOK_FEED))
+    channel = feed.find("channel")
+    if channel is None:
+        raise ValueError("Expected the Bank of Korea RSS channel")
+    candidates = {}
+    for entry in channel.findall("item"):
+        source = entry.findtext("link", "").strip()
+        parts = urlsplit(source)
+        if (parts.scheme != "https" or parts.netloc != "www.bok.or.kr"
+                or not re.fullmatch(r"/portal/bbs/[BP]\d{7}/view\.do", parts.path)
+                or not re.fullmatch(r"nttId=\d+&menuNo=\d+", parts.query)
+                or parts.fragment):
+            continue
+        try:
+            published = parsedate_to_datetime(entry.findtext("pubDate", ""))
+        except (TypeError, ValueError):
+            continue
+        title = plain(entry.findtext("title", ""))
+        if title and in_window(published, after, cutoff):
+            candidates[source] = {"title": title, "source": source, "sourceName": "한국은행",
+                                  "publishedAt": published.astimezone(KST).isoformat()}
+    return sorted(candidates.values(), key=lambda row: (row["publishedAt"], row["source"]),
+                  reverse=True)[:8]
+
+
+def candidates(topic, after, cutoff, seen, fetch, outcomes):
+    outcomes[topic] = "no_candidate"
+    feed_url, publisher, _ = SOURCES[topic]
+    feed = parse_feed(fetch(feed_url))
     entries = feed.findall("./channel/item") if topic == "policy" else feed.findall("./{*}entry")
     for entry in entries:
         try:
@@ -233,10 +265,18 @@ def collect(after, cutoff, seen=(), fetch=download, reviewed_path=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("after", type=datetime.fromisoformat)
-    parser.add_argument("through", type=datetime.fromisoformat)
+    parser.add_argument("after", type=datetime.fromisoformat, nargs="?")
+    parser.add_argument("through", type=datetime.fromisoformat, nargs="?")
     parser.add_argument("seen", nargs="*", help=argparse.SUPPRESS)
+    parser.add_argument("--domestic-candidates", action="store_true")
     args = parser.parse_args()
-    reviewed = Path(__file__).resolve().parents[1] / "config/reviewed-economic-news.json"
-    print(json.dumps(collect(args.after, args.through, args.seen, reviewed_path=reviewed),
-                     ensure_ascii=True))
+    if args.domestic_candidates:
+        cutoff = datetime.now(KST)
+        items = domestic_release_candidates(cutoff - timedelta(days=4), cutoff)
+        print(json.dumps(items, ensure_ascii=False, indent=2))
+    else:
+        if args.after is None or args.through is None:
+            parser.error("after and through are required for report selection")
+        reviewed = Path(__file__).resolve().parents[1] / "config/reviewed-economic-news.json"
+        print(json.dumps(collect(args.after, args.through, args.seen, reviewed_path=reviewed),
+                         ensure_ascii=True))

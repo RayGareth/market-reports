@@ -1,6 +1,7 @@
 name: Deploy latest public Market Daily
 on:
   workflow_call:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -13,12 +14,13 @@ on:
       - '.github/workflows/deploy-study-pages.yml'
 jobs:
   deploy:
-    if: vars.MARKET_PAGES_DEPLOY == 'true'
+    if: github.ref == 'refs/heads/main' && vars.MARKET_PAGES_DEPLOY == 'true'
     runs-on: ubuntu-latest
     concurrency:
       group: market-daily-public-pages
       cancel-in-progress: false
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write
@@ -39,6 +41,36 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/market-pages
+      - name: Confirm github-pages artifact for this run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          response=$(mktemp)
+          trap 'rm -f "$response"' EXIT
+          endpoint="$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?name=github-pages"
+          for attempt in 1 2 3 4; do
+            if status=$(curl --silent --show-error --connect-timeout 3 --max-time 5 \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --output "$response" --write-out '%{http_code}' "$endpoint"); then
+              if [[ "$status" == 200 ]]; then
+                if artifact_id=$(jq -er '[.artifacts[] | select(.name == "github-pages" and .expired == false)] | select(length == 1) | .[0].id' "$response"); then
+                  echo "Run $GITHUB_RUN_ID artifact $artifact_id confirmed (attempt $attempt)."
+                  exit 0
+                fi
+                detail=$(jq -c '{total_count, artifacts: [.artifacts[]? | {id, name, expired}]}' "$response" 2>/dev/null || head -c 400 "$response")
+              else
+                detail=$(jq -r '.message // empty' "$response" 2>/dev/null || head -c 400 "$response")
+              fi
+              echo "Artifact lookup $attempt/4: HTTP $status $detail"
+            else
+              echo "Artifact lookup $attempt/4: request failed (curl exit $?)."
+            fi
+            if (( attempt < 4 )); then sleep "$((attempt * 3))"; fi
+          done
+          echo "::error::Run $GITHUB_RUN_ID could not confirm one active github-pages artifact after 4 attempts. See the lookup responses above."
+          exit 1
       - name: Deploy approved public artifact
         id: deployment
         uses: actions/deploy-pages@v4
