@@ -8,6 +8,13 @@ from urllib.parse import urlsplit
 
 PUBLISHERS = {"050": "한경비즈니스", "079": "노컷뉴스"}
 LESSONS = {
+    "production_capacity": (
+        "생산능력과 가동률",
+        "생산능력은 설비가 일정 기간에 만들 수 있는 양입니다. 가동률은 그 능력을 실제 생산에 얼마나 활용했는지 보여 줍니다.",
+        "샤힌 설비가 상업 가동에 들어가면 실제 생산량, 판매량, 원료비를 함께 확인해 보세요.",
+        "설비 증설은 생산 여력을 늘리며, 수익성은 제품 가격과 비용, 가동률에 따라 달라질 수 있습니다.",
+        "준공일, 상업 가동일, 실제 판매 실적을 구분해 보세요.",
+    ),
     "global_sentiment": (
         "시장 변동성과 투자심리",
         "변동성은 가격이 얼마나 크게 움직이는지를 나타냅니다.",
@@ -31,6 +38,10 @@ LESSONS = {
     ),
 }
 QUESTIONS = {
+    "production_capacity": (
+        "샤힌 프로젝트 준공만으로 설비가 최대 생산량을 기록했다고 볼 수 있을까요?",
+        "실제 생산량은 가동 이후의 생산 실적으로 확인합니다. 준공은 설비 건설이 끝난 단계이고 가동률은 생산능력 대비 실제 생산량을 보여 줍니다.",
+    ),
     "global_sentiment": (
         "증시 추가 하락 전망과 이미 관측된 지수 하락 중 어느 쪽이 확인된 시장 사실인가요?",
         "이미 관측된 지수 하락입니다. 추가 하락은 전제가 있는 전망입니다.",
@@ -51,12 +62,17 @@ def editorial_article(item):
     try:
         parts = urlsplit(item["source"])
         link = re.fullmatch(r"/article/(\d{3})/\d{10}", parts.path)
+        publisher = None
+        if parts.netloc == "n.news.naver.com" and link:
+            publisher = PUBLISHERS.get(link[1])
+        if (parts.netloc == "magazine.hankyung.com"
+                and re.fullmatch(r"/business/article/\d{12}b", parts.path)):
+            publisher = PUBLISHERS["050"]
         published = datetime.fromisoformat(item["publishedAt"])
         observed = datetime.fromisoformat(item["observedAt"]) if "observedAt" in item else None
         return (
-            parts.scheme == "https" and parts.netloc == "n.news.naver.com"
-            and not parts.query and not parts.fragment and link is not None
-            and PUBLISHERS.get(link[1]) == item["sourceName"]
+            parts.scheme == "https" and not parts.query and not parts.fragment
+            and publisher is not None and publisher == item["sourceName"]
             and item["topic"] in LESSONS and item["region"] in {"kr", "overseas"}
             and re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", item["eventId"]) is not None
             and item["verified"] is True and published.utcoffset() is not None

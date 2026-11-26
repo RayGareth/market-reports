@@ -1,0 +1,19 @@
+name: Collect domestic economic news candidates
+on:
+  schedule:
+    - cron: '40 8 * * 1-5' # 17:40 KST
+permissions:
+  contents: read
+jobs:
+  collect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: List recent Bank of Korea releases for editorial review
+        run: |
+          python3 scripts/section02_news.py --domestic-candidates > "$RUNNER_TEMP/market-news-candidates.json"
+          cat "$RUNNER_TEMP/market-news-candidates.json"

@@ -3,6 +3,7 @@
 import os
 import subprocess
 import tempfile
+from datetime import date
 from pathlib import Path
 
 OUTPUTS = ['content/daily', 'reports/daily', 'reports/index.json', 'reports/latest.html', 'data/public-market.json']
@@ -13,7 +14,7 @@ def git(repo, *args, check=True):
         raise RuntimeError('Git publication operation failed; no remote overwrite attempted')
     return result
 
-def publish(repo, attempts=3, before_push=None, build_args=(), region=None, recover=False):
+def publish(repo, attempts=3, before_push=None, build_args=(), region=None, recover=False, news_date=None):
     repo = Path(repo).resolve()
     for attempt in range(attempts):
         git(repo, 'fetch', 'origin', 'main')
@@ -22,7 +23,9 @@ def publish(repo, attempts=3, before_push=None, build_args=(), region=None, reco
             work = Path(tmp) / 'checkout'
             git(repo, 'worktree', 'add', '--detach', str(work), head)
             try:
-                if region:
+                if news_date is not None:
+                    command = ['scripts/refresh_public_market.py', '--news-date', news_date.isoformat()]
+                elif region:
                     command = ['scripts/refresh_public_market.py', '--region', region]
                     if recover and region == 'kr':
                         command.append('--recover')
@@ -40,7 +43,9 @@ def publish(repo, attempts=3, before_push=None, build_args=(), region=None, reco
                     git(work, 'add', '--', *outputs)
                 if git(work, 'diff', '--cached', '--quiet', check=False).returncode == 0:
                     return head
-                message = 'Refresh public U.S. closes' if region == 'us' else 'Publish public daily study'
+                message = 'Revise public study news' if news_date else (
+                    'Refresh public U.S. closes' if region == 'us' else 'Publish public daily study'
+                )
                 git(work, 'commit', '-m', message)
                 if before_push:
                     before_push(attempt)
@@ -56,8 +61,10 @@ if __name__ == '__main__':
         raise SystemExit('Run through the publication workflow; no local checkout is modified')
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--region', required=True, choices=('kr', 'us'))
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--region', choices=('kr', 'us'))
+    mode.add_argument('--news-date', type=date.fromisoformat)
     parser.add_argument('--recover', action='store_true')
     args = parser.parse_args()
     print('Published public revision:', publish(Path(__file__).resolve().parents[1],
-                                               region=args.region, recover=args.recover))
+                                               region=args.region, recover=args.recover, news_date=args.news_date))
